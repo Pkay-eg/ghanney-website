@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ebenezer Ghanney — Fintech Executive & Entrepreneur</title>
+  <meta name="description" content="Portfolio of Ebenezer Ghanney — Fintech Executive and Entrepreneur. CEO of WeWire Technologies, specializing in cross-border payments across Africa and North America.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+  <style>
+    /* ── Reset ── */
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    /* ── Custom Fonts ── */
+    /* Using Playfair Display as a close web substitute for Gealova */
+
+    :root {
+      --bg: #eeeeee;
+      --black: #000000;
+      --dark: #050505;
+      --font-display: 'Playfair Display', Georgia, serif;
+      --font-body: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+      --max-width: 1440px;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--black);
+      font-family: var(--font-body);
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    /* ── Navigation ── */
+    nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 100;
+      display: flex;
+      justify-content: center;
+      gap: 60px;
+      padding: 32px 0;
+      font-family: var(--font-body);
+      font-size: 16px;
+      background: rgba(238, 238, 238, 0.85);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+
+    nav a {
+      color: var(--black);
+      text-decoration: none;
+      transition: opacity 0.3s;
+    }
+
+    nav a:hover {
+      opacity: 0.5;
+    }
+
+    /* ── Hero Section ── */
+    .hero {
+      padding: 100px 40px 0;
+      max-width: var(--max-width);
+      margin: 0 auto;
+      text-align: center;
+      overflow: hidden;
+    }
+
+    .hero-name-top {
+      font-family: var(--font-display);
+      font-size: clamp(40px, 14vw, 200px);
+      font-weight: 400;
+      font-style: italic;
+      line-height: 0.86;
+      letter-spacing: -0.02em;
+      overflow-wrap: break-word;
+      word-break: break-word;
+    }
+
+    .hero-subtitle {
+      font-family: var(--font-body);
+      font-size: clamp(14px, 1.7vw, 24px);
+      font-weight: 300;
+      margin-top: 28px;
+      letter-spacing: 0.02em;
+    }
+
+    /* Photo Gallery */
+    .photo-gallery {
+      display: flex;
+      gap: 22px;
+      justify-content: center;
+      align-items: flex-end;
+      margin-top: 48px;
+      padding: 0 20px;
+    }
+
+    .photo-gallery .photo {
+      background: var(--dark);
+      overflow: hidden;
+      flex-shrink: 1;
+      min-width: 0;
+    }
+
+    .photo-gallery .photo img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: top;
+      display: block;
+    }
+
+    .photo-gallery .photo:nth-child(1),
+    .photo-gallery .photo:nth-child(2),
+    .photo-gallery .photo:nth-child(4),
+    .photo-gallery .photo:nth-child(5) {
+      width: calc((100% - 311px - 88px) / 4);
+      max-width: 253px;
+      aspect-ratio: 253 / 267;
+    }
+
+    .photo-gallery .photo:nth-child(3) {
+      width: 311px;
+      max-width: 28%;
+      aspect-ratio: 311 / 328;
+    }
+
+    .hero-name-bottom {
+      font-family: var(--font-display);
+      font-size: clamp(32px, 8vw, 115px);
+      font-weight: 400;
+      font-style: italic;
+      line-height: 1;
+      margin-top: 32px;
+      letter-spacing: -0.02em;
+      overflow-wrap: break-word;
+      word-break: break-word;
+    }
+
+    /* ── About Section ── */
+    .about {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: 120px 90px;
+      position: relative;
+      min-height: 780px;
+      overflow: hidden;
+    }
+
+    .about-text-top {
+      font-family: var(--font-body);
+      font-weight: 300;
+      font-size: clamp(16px, 1.4vw, 20px);
+      line-height: 1.6;
+      max-width: 557px;
+      position: relative;
+      z-index: 2;
+    }
+
+    .about-image-right {
+      position: absolute;
+      right: 90px;
+      top: 80px;
+      width: min(389px, 30%);
+      height: 410px;
+      background: var(--dark);
+      overflow: hidden;
+      z-index: 1;
+    }
+
+    .about-image-right img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: top;
+    }
+
+    .about-image-left {
+      position: absolute;
+      left: 131px;
+      top: 350px;
+      width: min(389px, 30%);
+      height: 410px;
+      background: var(--dark);
+      overflow: hidden;
+      z-index: 1;
+    }
+
+    .about-image-left img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: top;
+    }
+
+    .about-text-bottom {
+      font-family: var(--font-body);
+      font-weight: 300;
+      font-size: clamp(16px, 1.4vw, 20px);
+      line-height: 1.6;
+      max-width: 623px;
+      position: absolute;
+      right: 90px;
+      bottom: 80px;
+      z-index: 2;
+    }
+
+    /* ── Experience Section ── */
+    .experience {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: 80px 80px 120px;
+      overflow: hidden;
+    }
+
+    .section-title {
+      font-family: var(--font-display);
+      font-size: clamp(40px, 12.5vw, 180px);
+      font-weight: 400;
+      font-style: italic;
+      text-align: center;
+      line-height: 1;
+      letter-spacing: -0.02em;
+      margin-bottom: 80px;
+      overflow-wrap: break-word;
+      word-break: break-word;
+    }
+
+    .experience-item {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 60px;
+      padding: 40px 0;
+      border-bottom: 0.7px solid rgba(0, 0, 0, 0.2);
+    }
+
+    .experience-item:first-of-type {
+      border-top: 0.7px solid rgba(0, 0, 0, 0.2);
+    }
+
+    .exp-role {
+      font-family: var(--font-display);
+      font-size: clamp(24px, 2.8vw, 40px);
+      font-weight: 400;
+      font-style: italic;
+      line-height: 1;
+    }
+
+    .exp-company {
+      font-family: var(--font-body);
+      font-size: 18px;
+      margin-top: 16px;
+      font-weight: 400;
+    }
+
+    .exp-description {
+      font-family: var(--font-body);
+      font-weight: 300;
+      font-size: clamp(16px, 1.4vw, 20px);
+      line-height: 1.6;
+    }
+
+    /* ── Core Skills Section ── */
+    .skills {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: 80px 80px 120px;
+      overflow: hidden;
+    }
+
+    .skills .section-title {
+      font-size: clamp(40px, 10.4vw, 150px);
+      text-transform: uppercase;
+    }
+
+    .skills-content {
+      display: grid;
+      grid-template-columns: minmax(0, 530px) 1fr;
+      gap: 130px;
+      align-items: start;
+      padding: 0 50px;
+    }
+
+    .skills-image {
+      width: 100%;
+      aspect-ratio: 530 / 560;
+      background: var(--dark);
+      overflow: hidden;
+    }
+
+    .skills-image img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: top;
+    }
+
+    .skills-list {
+      list-style: none;
+      padding-top: 38px;
+    }
+
+    .skills-list li {
+      font-family: var(--font-display);
+      font-size: clamp(26px, 3.3vw, 48px);
+      font-weight: 400;
+      font-style: italic;
+      padding: 30px 0;
+      border-top: 0.7px solid rgba(0, 0, 0, 0.3);
+      transition: opacity 0.3s;
+    }
+
+    .skills-list li:last-child {
+      border-bottom: 0.7px solid rgba(0, 0, 0, 0.3);
+    }
+
+    .skills-list li:nth-child(2) { opacity: 0.8; }
+    .skills-list li:nth-child(3) { opacity: 0.6; }
+    .skills-list li:nth-child(4) { opacity: 0.3; }
+
+    .skills-list li:hover {
+      opacity: 1 !important;
+    }
+
+    /* ── Achievements Section ── */
+    .achievements {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: 80px 80px 120px;
+      overflow: hidden;
+    }
+
+    .achievements .section-title {
+      font-size: clamp(40px, 9vw, 130px);
+      text-transform: uppercase;
+      margin-bottom: 60px;
+    }
+
+    .achievements-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 80px 120px;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    .achievement-card {
+      opacity: 0;
+      transform: translateY(30px);
+      animation: fadeInUp 0.6s forwards;
+    }
+
+    .achievement-card:nth-child(1) { animation-delay: 0s; }
+    .achievement-card:nth-child(2) { animation-delay: 0.15s; }
+    .achievement-card:nth-child(3) { animation-delay: 0.3s; }
+    .achievement-card:nth-child(4) { animation-delay: 0.45s; }
+
+    @keyframes fadeInUp {
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .achievement-stat {
+      display: flex;
+      align-items: flex-end;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .achievement-number {
+      font-family: var(--font-display);
+      font-size: clamp(32px, 3.8vw, 55px);
+      font-weight: 400;
+      font-style: italic;
+      line-height: 0.85;
+    }
+
+    .achievement-label {
+      font-family: var(--font-body);
+      font-size: 18px;
+      line-height: 1.35;
+    }
+
+    .achievement-desc {
+      font-family: var(--font-body);
+      font-weight: 300;
+      font-size: 14px;
+      line-height: 1.6;
+      max-width: 274px;
+    }
+
+    /* ── Footer ── */
+    footer {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: 100px 40px 80px;
+      text-align: center;
+      overflow: hidden;
+    }
+
+    .footer-name {
+      font-family: var(--font-display);
+      font-style: italic;
+      line-height: 1;
+      letter-spacing: -0.02em;
+      overflow-wrap: break-word;
+      word-break: break-word;
+    }
+
+    .footer-name .first {
+      font-size: clamp(32px, 8vw, 115px);
+      display: block;
+    }
+
+    .footer-name .last {
+      font-size: clamp(40px, 14vw, 200px);
+      display: block;
+    }
+
+    .footer-links {
+      display: flex;
+      justify-content: center;
+      gap: clamp(40px, 14.7vw, 211px);
+      margin-top: 80px;
+      font-family: var(--font-display);
+      font-style: italic;
+      font-size: clamp(18px, 1.8vw, 26px);
+    }
+
+    .footer-links a {
+      color: var(--black);
+      text-decoration: none;
+      transition: opacity 0.3s;
+    }
+
+    .footer-links a:hover {
+      opacity: 0.5;
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 1024px) {
+      .about {
+        padding: 80px 40px;
+        display: flex;
+        flex-direction: column;
+        gap: 40px;
+        min-height: auto;
+      }
+
+      .about-text-top,
+      .about-text-bottom {
+        position: static;
+        max-width: 100%;
+      }
+
+      .about-image-right,
+      .about-image-left {
+        position: static;
+        width: 100%;
+        max-width: 389px;
+        margin: 0 auto;
+      }
+
+      .about-image-left {
+        order: 3;
+      }
+
+      .about-text-bottom {
+        order: 4;
+      }
+
+      .skills-content {
+        grid-template-columns: 1fr;
+        gap: 60px;
+        padding: 0;
+      }
+
+      .skills-image {
+        max-width: 530px;
+        margin: 0 auto;
+      }
+
+      .experience-item {
+        grid-template-columns: 1fr;
+        gap: 20px;
+      }
+
+      .achievements-grid {
+        gap: 50px 60px;
+      }
+    }
+
+    @media (max-width: 768px) {
+      nav {
+        gap: 30px;
+        padding: 20px 0;
+        font-size: 14px;
+      }
+
+      .hero {
+        padding: 80px 20px 0;
+      }
+
+      .photo-gallery {
+        gap: 8px;
+        padding: 0 10px;
+      }
+
+      .photo-gallery .photo:nth-child(1),
+      .photo-gallery .photo:nth-child(2),
+      .photo-gallery .photo:nth-child(4),
+      .photo-gallery .photo:nth-child(5) {
+        width: 20%;
+        max-width: none;
+      }
+
+      .photo-gallery .photo:nth-child(3) {
+        width: 24%;
+      }
+
+      .experience,
+      .skills,
+      .achievements {
+        padding: 60px 30px 80px;
+      }
+
+      .achievements-grid {
+        grid-template-columns: 1fr;
+        gap: 40px;
+      }
+
+      .footer-links {
+        flex-wrap: wrap;
+        gap: 20px 40px;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .photo-gallery .photo:nth-child(4),
+      .photo-gallery .photo:nth-child(5) {
+        display: none;
+      }
+
+      .photo-gallery .photo:nth-child(1),
+      .photo-gallery .photo:nth-child(2) {
+        width: 30%;
+      }
+
+      .photo-gallery .photo:nth-child(3) {
+        width: 36%;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Navigation -->
+  <nav>
+    <a href="#about">About</a>
+    <a href="#experience">Experience</a>
+    <a href="#achievements">Achievements</a>
+  </nav>
+
+  <!-- Hero Section -->
+  <section class="hero">
+    <h1 class="hero-name-top">EBENEZER</h1>
+    <p class="hero-subtitle">Fintech Executive and Entrepreneur</p>
+
+    <div class="photo-gallery">
+      <div class="photo"><img src="images/IMG_4042.JPG" alt="Ebenezer speaking at Africa Tech Summit" loading="lazy"></div>
+      <div class="photo"><img src="images/image4.png" alt="Ebenezer at WeWire HackHive" loading="lazy"></div>
+      <div class="photo"><img src="images/IMG_9476.JPG" alt="Ebenezer portrait by the coast" loading="eager"></div>
+      <div class="photo"><img src="images/image3.png" alt="Ebenezer receiving an award" loading="lazy"></div>
+      <div class="photo"><img src="images/IMG_4039.JPG" alt="Ebenezer at Africa Tech Summit" loading="lazy"></div>
+    </div>
+
+    <p class="hero-name-bottom">GHANNEY</p>
+  </section>
+
+  <!-- About Section -->
+  <section class="about" id="about">
+    <p class="about-text-top">
+      A dynamic Financial Technology Executive with extensive experience in foreign exchange, financial services, and business development across Africa and North America. Currently running WeWire, A B2B cross-border payments company.
+    </p>
+    <div class="about-image-right">
+      <img src="images/image7.png" alt="Ebenezer speaking on stage" loading="lazy">
+    </div>
+    <div class="about-image-left">
+      <img src="images/IMG_4040.JPG" alt="Ebenezer with colleagues at Africa Tech Summit" loading="lazy">
+    </div>
+    <p class="about-text-bottom">
+      Successfully scaled multiple fintech startups, led market expansion initiatives, and managed trading operations exceeding $2B in volume. Proven track record in building and leading high-performance teams, developing strategic partnerships, and driving sustainable business growth in emerging markets.
+    </p>
+  </section>
+
+  <!-- Experience Section -->
+  <section class="experience" id="experience">
+    <h2 class="section-title">EXPERIENCE</h2>
+
+    <div class="experience-item">
+      <div>
+        <h3 class="exp-role">Chief Executive Officer</h3>
+        <p class="exp-company">WeWire Technologies Inc. &bull; 2022 - Present</p>
+      </div>
+      <p class="exp-description">
+        Leading global expansion and strategic initiatives across Africa and North America. Secured Canadian MSB license and built partnerships with major financial institutions. Currently developing and executing market entry strategies for multiple regions.
+      </p>
+    </div>
+
+    <div class="experience-item">
+      <div>
+        <h3 class="exp-role">Country Manager</h3>
+        <p class="exp-company">Yellow Card Financial &bull; 2020 - 2022</p>
+      </div>
+      <p class="exp-description">
+        Scaled operations from zero to over 150,000 users and $20M+ trading volume. Established and managed relationships with major banks. Helped the company with recruitment of new staff in Ghana.
+      </p>
+    </div>
+
+    <div class="experience-item">
+      <div>
+        <h3 class="exp-role">Head of Business</h3>
+        <p class="exp-company">Liquid Financial Services &bull; 2018 - 2020</p>
+      </div>
+      <p class="exp-description">
+        Spearheaded business development and market expansion initiatives. Managed relationships with key stakeholders including regulators and financial institutions. Developed the Liquid loyalty reward program. Led usability testing for a new product the company was considering launching. Tasked with customer and market research for new products.
+      </p>
+    </div>
+  </section>
+
+  <!-- Core Skills Section -->
+  <section class="skills">
+    <h2 class="section-title">Core Skills</h2>
+
+    <div class="skills-content">
+      <div class="skills-image">
+        <img src="images/IMG_4536.png" alt="Ebenezer at Stripe Commons" loading="lazy">
+      </div>
+      <ul class="skills-list">
+        <li>Leadership</li>
+        <li>Operations</li>
+        <li>Business Dev</li>
+        <li>Finance</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- Achievements Section -->
+  <section class="achievements" id="achievements">
+    <h2 class="section-title">ACHIEVEMENTS</h2>
+
+    <div class="achievements-grid">
+      <div class="achievement-card">
+        <div class="achievement-stat">
+          <span class="achievement-number">$2B+</span>
+          <span class="achievement-label">Trading<br>Volume</span>
+        </div>
+        <p class="achievement-desc">Successfully managed FX trading operations exceeding $2 billion in volume across multiple markets</p>
+      </div>
+
+      <div class="achievement-card">
+        <div class="achievement-stat">
+          <span class="achievement-number">150K+</span>
+          <span class="achievement-label">User Growth</span>
+        </div>
+        <p class="achievement-desc">Scaled Yellow Card's operations from zero to over 150,000 active users in under 12 months</p>
+      </div>
+
+      <div class="achievement-card">
+        <div class="achievement-stat">
+          <span class="achievement-number">7+</span>
+          <span class="achievement-label">Market Expansion</span>
+        </div>
+        <p class="achievement-desc">Successfully led market entry and operations across Ghana, Nigeria, Kenya, Uganda, UAE, USA and Canada</p>
+      </div>
+
+      <div class="achievement-card">
+        <div class="achievement-stat">
+          <span class="achievement-number">300%</span>
+          <span class="achievement-label">Revenue<br>Growth</span>
+        </div>
+        <p class="achievement-desc">Achieved 300% growth in transaction volume through strategic partnerships and market expansion</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer>
+    <div class="footer-name">
+      <span class="first">EBENEZER</span>
+      <span class="last">GHANNEY</span>
+    </div>
+    <div class="footer-links">
+      <a href="https://www.linkedin.com/in/ebenezer-ghanney-6995888a/" target="_blank" rel="noopener">Linkedin</a>
+      <a href="https://medium.com/@pkay12" target="_blank" rel="noopener">Medium</a>
+      <a href="https://x.com/_Iampkay" target="_blank" rel="noopener">X</a>
+      <a href="https://calendar.google.com/calendar/appointments/schedules/AcZssZ3RpE7kaqOgKWy4EayBKbpboiDYv_aO1hZMmeLny1DV-hb4L03HposJXWjp10_ABilOD_edPhef" target="_blank" rel="noopener">Book A Meeting</a>
+    </div>
+  </footer>
+
+</body>
+</html>
