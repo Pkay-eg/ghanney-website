@@ -601,6 +601,15 @@ function TicketScreen({ data, contribute, onShowAfter, showAfter }) {
   const [savingPng, setSavingPng] = useState(false);
 
   const calendar = () => {
+    if (isInAppBrowser()) {
+      const gcalUrl = "https://calendar.google.com/calendar/render?action=TEMPLATE" +
+        "&text=" + encodeURIComponent("Pkay's 30th — Midnight Masquerade") +
+        "&dates=20260516T190000/20260517T020000" +
+        "&location=" + encodeURIComponent(EVENT.venue + ", " + EVENT.city) +
+        "&details=" + encodeURIComponent("Black tie + Masquerade Mask required. Doors close at 7:30 PM.");
+      window.open(gcalUrl, "_blank");
+      return;
+    }
     const lines = [
       "BEGIN:VCALENDAR",
       "VERSION:2.0",
@@ -811,21 +820,38 @@ function TicketScreen({ data, contribute, onShowAfter, showAfter }) {
     return canvas;
   };
 
+  const [showTicketImage, setShowTicketImage] = useState(null);
+
+  const isInAppBrowser = () => {
+    const ua = navigator.userAgent || "";
+    return /FBAN|FBAV|Instagram|Twitter|WhatsApp|Line|Snapchat|TikTok|wv\)/i.test(ua);
+  };
+
   const downloadPng = () => {
     setSavingPng(true);
     return renderTicketCanvas().then((canvas) => {
       return new Promise((resolve) => {
         canvas.toBlob((blob) => {
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement("a");
-          a.href = url;
-          a.download = `pkay-30-ticket-${code}.png`;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          setTimeout(() => URL.revokeObjectURL(url), 1000);
-          setSavingPng(false);
-          resolve();
+          if (isInAppBrowser()) {
+            const reader = new FileReader();
+            reader.onload = () => {
+              setShowTicketImage(reader.result);
+              setSavingPng(false);
+              resolve();
+            };
+            reader.readAsDataURL(blob);
+          } else {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `pkay-30-ticket-${code}.png`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+            setSavingPng(false);
+            resolve();
+          }
         }, "image/png");
       });
     }).catch((e) => {
@@ -977,6 +1003,17 @@ function TicketScreen({ data, contribute, onShowAfter, showAfter }) {
             </div>
           </div>
         </div>
+
+        {/* In-app browser: show ticket image for long-press save */}
+        {showTicketImage && (
+          <div style={{ marginTop: 20, padding: 16, borderRadius: 12, border: "1px solid var(--hair)", background: "var(--ink-2)", textAlign: "center" }}>
+            <div style={{ fontSize: 12, color: "var(--gold)", letterSpacing: "0.2em", textTransform: "uppercase", fontWeight: 600, marginBottom: 10 }}>
+              Press &amp; hold the image to save
+            </div>
+            <img src={showTicketImage} alt="Your ticket" style={{ width: "100%", maxWidth: 320, borderRadius: 8 }} />
+            <button className="btn-ghost" style={{ marginTop: 12 }} onClick={() => setShowTicketImage(null)}>Dismiss</button>
+          </div>
+        )}
 
         {/* Actions */}
         <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 24 }}>
