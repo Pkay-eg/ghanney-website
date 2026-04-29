@@ -312,7 +312,6 @@ function StepFrame({ stepIdx, total, title, eyebrow, children, onBack, onNext, n
 function AttendStep({ value, onChange, onNext, onBack }) {
   const options = [
     { id: "yes", title: "With pleasure", sub: "I shall be there", glyph: "♕" },
-    { id: "maybe", title: "Likely so", sub: "Pencil me in tentatively", glyph: "◊" },
     { id: "no", title: "Regrettably, no", sub: "I cannot attend this time", glyph: "✕" },
   ];
   return (
