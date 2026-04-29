@@ -923,23 +923,19 @@ async function generateTicketPng(guest) {
   drawRoundRect(qrX - 20, qrY - 20, qrSize + 40, qrSize + 40, 12);
   ctx.fill();
 
-  let hash = 0;
-  const val = `PKAY30-${codeStr}-${name}`;
-  for (let i = 0; i < val.length; i++) hash = (hash * 131 + val.charCodeAt(i)) >>> 0;
-  let seed = hash || 1;
-  const rand = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 0xffffffff; };
-  const N = 25, cellSz = qrSize / N;
+  // Real QR code
+  const qrVal = `PKAY30-${codeStr}-${name}`;
+  const qrGen = qrcode(0, "M");
+  qrGen.addData(qrVal);
+  qrGen.make();
+  const modCount = qrGen.getModuleCount();
+  const cellSz = qrSize / modCount;
   ctx.fillStyle = "#1a0e0a";
-  for (let yy = 0; yy < N; yy++) {
-    for (let xx = 0; xx < N; xx++) {
-      const inFinder = (xx < 7 && yy < 7) || (xx >= N - 7 && yy < 7) || (xx < 7 && yy >= N - 7);
-      let on = false;
-      if (inFinder) {
-        const fx = xx < 7 ? xx : xx - (N - 7);
-        const fy = yy < 7 ? yy : yy - (N - 7);
-        on = (fx === 0 || fx === 6 || fy === 0 || fy === 6) || (fx >= 2 && fx <= 4 && fy >= 2 && fy <= 4);
-      } else { on = rand() > 0.48; }
-      if (on) ctx.fillRect(qrX + xx * cellSz, qrY + yy * cellSz, cellSz - 0.5, cellSz - 0.5);
+  for (let yy = 0; yy < modCount; yy++) {
+    for (let xx = 0; xx < modCount; xx++) {
+      if (qrGen.isDark(yy, xx)) {
+        ctx.fillRect(qrX + xx * cellSz, qrY + yy * cellSz, cellSz, cellSz);
+      }
     }
   }
 

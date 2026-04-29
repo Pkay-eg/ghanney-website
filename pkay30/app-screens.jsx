@@ -449,38 +449,21 @@ const WALLETS = {
 };
 
 function QrSquare({ value, size = 160, dark = "#0a0807" }) {
-  // Deterministic pseudo-QR: hash the string into a 21x21 grid.
-  // Not a real QR — visually consistent placeholder.
   const grid = useMemo(() => {
-    const N = 21;
+    const qr = qrcode(0, "M");
+    qr.addData(value);
+    qr.make();
+    const count = qr.getModuleCount();
     const out = [];
-    let h = 0;
-    for (let i = 0; i < value.length; i++) h = (h * 131 + value.charCodeAt(i)) >>> 0;
-    let s = h || 1;
-    const rand = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 0xffffffff; };
-    for (let y = 0; y < N; y++) {
+    for (let y = 0; y < count; y++) {
       const row = [];
-      for (let x = 0; x < N; x++) {
-        // Finder patterns at corners
-        const inFinder =
-          (x < 7 && y < 7) ||
-          (x >= N - 7 && y < 7) ||
-          (x < 7 && y >= N - 7);
-        if (inFinder) {
-          const fx = x < 7 ? x : x - (N - 7);
-          const fy = y < 7 ? y : y - (N - 7);
-          const onEdge = fx === 0 || fx === 6 || fy === 0 || fy === 6;
-          const inner = fx >= 2 && fx <= 4 && fy >= 2 && fy <= 4;
-          row.push(onEdge || inner ? 1 : 0);
-        } else {
-          row.push(rand() > 0.5 ? 1 : 0);
-        }
-      }
+      for (let x = 0; x < count; x++) row.push(qr.isDark(y, x) ? 1 : 0);
       out.push(row);
     }
     return out;
   }, [value]);
-  const cell = size / 21;
+  const count = grid.length;
+  const cell = size / count;
   return (
     <div className="qr-box" style={{ width: size + 28, height: size + 28 }}>
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
@@ -776,25 +759,18 @@ function TicketScreen({ data, contribute, onShowAfter, showAfter }) {
     drawRoundRect(qrX - 20, qrY - 20, qrSize + 40, qrSize + 40, 12);
     ctx.fill();
 
-    // Pseudo-QR pattern
-    let hash = 0;
-    const val = `PKAY30-${code}-${data.name || ""}`;
-    for (let i = 0; i < val.length; i++) hash = (hash * 131 + val.charCodeAt(i)) >>> 0;
-    let seed = hash || 1;
-    const rand = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 0xffffffff; };
-    const N = 25, cellSz = qrSize / N;
+    // Real QR code
+    const qrVal = `PKAY30-${code}-${data.name || ""}`;
+    const qrGen = qrcode(0, "M");
+    qrGen.addData(qrVal);
+    qrGen.make();
+    const modCount = qrGen.getModuleCount();
+    const cellSz = qrSize / modCount;
     ctx.fillStyle = "#1a0e0a";
-    for (let yy = 0; yy < N; yy++) {
-      for (let xx = 0; xx < N; xx++) {
-        const inFinder = (xx < 7 && yy < 7) || (xx >= N - 7 && yy < 7) || (xx < 7 && yy >= N - 7);
-        let on = false;
-        if (inFinder) {
-          const fx = xx < 7 ? xx : xx - (N - 7);
-          const fy = yy < 7 ? yy : yy - (N - 7);
-          on = (fx === 0 || fx === 6 || fy === 0 || fy === 6) || (fx >= 2 && fx <= 4 && fy >= 2 && fy <= 4);
-        } else { on = rand() > 0.48; }
-        if (on) {
-          ctx.fillRect(qrX + xx * cellSz, qrY + yy * cellSz, cellSz - 0.5, cellSz - 0.5);
+    for (let yy = 0; yy < modCount; yy++) {
+      for (let xx = 0; xx < modCount; xx++) {
+        if (qrGen.isDark(yy, xx)) {
+          ctx.fillRect(qrX + xx * cellSz, qrY + yy * cellSz, cellSz, cellSz);
         }
       }
     }
