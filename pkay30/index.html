@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Pkay's 30th — Midnight Masquerade</title>
+<link rel="stylesheet" href="styles.css" />
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+
+<!-- Shared screens / components -->
+<script type="text/babel" src="app-screens.jsx"></script>
+<!-- CRM + submission -->
+<script type="text/babel" src="crm.jsx"></script>
+<!-- Tweaks panel starter -->
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+
+<script type="text/babel">
+const { useState, useEffect, useRef } = React;
+
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "palette": "oxblood",
+  "headline": "Midnight|Masquerade",
+  "introHeadline": "invites you to a midnight masquerade",
+  "showCrypto": true,
+  "showAfter": true,
+  "music": false,
+  "maskStyle": "ornate"
+}/*EDITMODE-END*/;
+
+// Ambient music — gentle synthesized pad via WebAudio so we don't need an mp3 asset.
+function useAmbient(on) {
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!on) {
+      if (ref.current) {
+        try { ref.current.stop(); } catch(e){}
+        ref.current = null;
+      }
+      return;
+    }
+    try {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return;
+      const ctx = new Ctx();
+      const master = ctx.createGain();
+      master.gain.value = 0.0;
+      master.gain.linearRampToValueAtTime(0.06, ctx.currentTime + 2);
+      master.connect(ctx.destination);
+      const notes = [110, 138.59, 164.81, 220]; // A2 / C#3 / E3 / A3
+      const oscs = notes.map((f, i) => {
+        const o = ctx.createOscillator();
+        o.type = i === 3 ? "triangle" : "sine";
+        o.frequency.value = f;
+        const g = ctx.createGain();
+        g.gain.value = 0.25;
+        // gentle LFO swell
+        const lfo = ctx.createOscillator();
+        lfo.frequency.value = 0.05 + i * 0.02;
+        const lfoG = ctx.createGain();
+        lfoG.gain.value = 0.12;
+        lfo.connect(lfoG).connect(g.gain);
+        lfo.start();
+        o.connect(g).connect(master);
+        o.start();
+        return { o, lfo };
+      });
+      ref.current = {
+        stop: () => {
+          master.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.6);
+          setTimeout(() => { try { ctx.close(); } catch(e){} }, 700);
+        },
+      };
+    } catch (e) { console.warn(e); }
+    return () => {
+      if (ref.current) { try { ref.current.stop(); } catch(e){} ref.current = null; }
+    };
+  }, [on]);
+}
+
+function App() {
+  const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+  const [phase, setPhase] = useState(
+    typeof window !== "undefined" && /[?&]admin=1/.test(window.location.search) ? "admin" : "intro"
+  );
+  const [step, setStep] = useState(0); // for rsvp flow
+  const [data, setData] = useState({ name: "", phone: "", email: "", guests: 1, guestNames: [], message: "" });
+  const [contribute, setContribute] = useState({ tier: null });
+  const [submitState, setSubmitState] = useState({ status: "idle" });
+  const [musicOn, setMusicOn] = useState(t.music);
+
+  useEffect(() => { setMusicOn(t.music); }, [t.music]);
+  useAmbient(musicOn);
+
+  // Apply palette
+  useEffect(() => {
+    document.documentElement.dataset.palette = t.palette;
+  }, [t.palette]);
+
+  // Flow
+  const goCover  = () => { setPhase("cover"); window.scrollTo(0, 0); };
+  const goRsvp   = () => { setPhase("rsvp"); setStep(0); window.scrollTo(0, 0); };
+  const goRegrets= () => { setPhase("regrets"); window.scrollTo(0, 0); };
+  const goTicket = () => { setPhase("ticket"); window.scrollTo(0, 0); };
+  const goAfter  = () => { setPhase("after"); window.scrollTo(0, 0); };
+
+  const nextStep = async () => {
+    if (step === 0 && data.attend === "no") {
+      // Submit the regret immediately
+      setSubmitState({ status: "sending" });
+      const r = await submitRSVP({ ...data, tier: contribute.tier, code: "" });
+      setSubmitState({ status: r.ok ? "ok" : "err", mocked: r.mocked });
+      goRegrets(); return;
+    }
+    if (step >= 4) {
+      // Final submit before showing ticket
+      setSubmitState({ status: "sending" });
+      const r = await submitRSVP({ ...data, tier: contribute.tier });
+      setSubmitState({ status: r.ok ? "ok" : "err", mocked: r.mocked });
+      goTicket(); return;
+    }
+    setStep(step + 1);
+    window.scrollTo(0, 0);
+  };
+  const backStep = () => {
+    if (step <= 0) { setPhase("cover"); return; }
+    setStep(step - 1);
+    window.scrollTo(0, 0);
+  };
+
+  // Fade between phases
+  return (
+    <div className="vignette" style={{ minHeight: "100dvh", position: "relative" }}>
+      <Petals count={10} />
+      <MusicToggle on={musicOn} setOn={(v) => { setMusicOn(v); setTweak("music", v); }} />
+
+      <div style={{ position: "relative", zIndex: 2 }}>
+        {phase === "admin" && (
+          <CRMView onClose={() => {
+            const url = window.location.pathname;
+            window.history.replaceState({}, "", url);
+            setPhase("intro");
+          }} />
+        )}
+
+        {phase === "intro" && (
+          <IntroScreen onOpen={goCover} headline={t.introHeadline} />
+        )}
+
+        {phase === "cover" && (
+          <CoverScreen onBegin={goRsvp} headline={t.headline} />
+        )}
+
+        {phase === "rsvp" && step === 0 && (
+          <AttendStep
+            value={data.attend}
+            onChange={(v) => setData({ ...data, attend: v })}
+            onNext={nextStep}
+            onBack={() => setPhase("cover")}
+          />
+        )}
+        {phase === "rsvp" && step === 1 && (
+          <IdentityStep data={data} setData={setData} onNext={nextStep} onBack={backStep} />
+        )}
+        {phase === "rsvp" && step === 2 && (
+          <GuestsStep data={data} setData={setData} onNext={nextStep} onBack={backStep} />
+        )}
+        {phase === "rsvp" && step === 3 && (
+          <MessageStep data={data} setData={setData} onNext={nextStep} onBack={backStep} />
+        )}
+        {phase === "rsvp" && step === 4 && (
+          t.showCrypto
+            ? <ContributeStep onNext={goTicket} onBack={backStep} contribute={contribute} setContribute={setContribute} />
+            : (() => { goTicket(); return null; })()
+        )}
+
+        {phase === "regrets" && (
+          <RegretsScreen data={data} onBack={() => { setPhase("rsvp"); setStep(0); }} />
+        )}
+
+        {phase === "ticket" && (
+          <TicketScreen data={data} contribute={contribute} showAfter={t.showAfter} onShowAfter={goAfter} />
+        )}
+
+        {phase === "after" && (
+          <AfterPartyScreen onBack={goTicket} />
+        )}
+      </div>
+
+      {/* Tweaks panel */}
+      <TweaksPanel title="Tweaks">
+        <TweakSection label="Theme" />
+        <TweakRadio label="Palette" value={t.palette}
+          options={["midnight", "oxblood", "onyx", "champagne"]}
+          onChange={(v) => setTweak("palette", v)} />
+
+        <TweakSection label="Hero" />
+        <TweakText label="Cover headline (use | to break line)" value={t.headline}
+          onChange={(v) => setTweak("headline", v)} />
+        <TweakText label="Intro tagline" value={t.introHeadline}
+          onChange={(v) => setTweak("introHeadline", v)} />
+
+        <TweakSection label="Sections" />
+        <TweakToggle label="Show contribution flow" value={t.showCrypto}
+          onChange={(v) => setTweak("showCrypto", v)} />
+        <TweakToggle label="Show after-party" value={t.showAfter}
+          onChange={(v) => setTweak("showAfter", v)} />
+        <TweakToggle label="Ambient music" value={t.music}
+          onChange={(v) => { setTweak("music", v); setMusicOn(v); }} />
+
+        <TweakSection label="Jump to screen" />
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 6 }}>
+          {[
+            ["intro", "Intro"],
+            ["cover", "Cover"],
+            ["rsvp-0", "Attend?"],
+            ["rsvp-1", "Identity"],
+            ["rsvp-2", "Guests"],
+            ["rsvp-3", "Message"],
+            ["rsvp-4", "Contribute"],
+            ["ticket", "Ticket"],
+            ["after", "After-party"],
+            ["regrets", "Regrets"],
+            ["admin", "CRM"],
+          ].map(([id, label]) => (
+            <TweakButton key={id} label={label}
+              onClick={() => {
+                if (id.startsWith("rsvp-")) {
+                  setPhase("rsvp"); setStep(parseInt(id.split("-")[1], 10));
+                } else {
+                  setPhase(id);
+                }
+                window.scrollTo(0,0);
+              }} />
+          ))}
+        </div>
+      </TweaksPanel>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
