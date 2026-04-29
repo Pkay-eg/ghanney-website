@@ -259,7 +259,7 @@ function CoverScreen({ onBegin, headline }) {
 // ─────────────────────────────────────────────────────────
 function StepFrame({ stepIdx, total, title, eyebrow, children, onBack, onNext, nextLabel = "Continue", nextDisabled, onSkip }) {
   return (
-    <div className="stage fade-in" style={{ padding: "28px 24px 36px", position: "relative", overflow: "hidden" }}>
+    <div className="stage fade-in" style={{ padding: "28px 24px 36px", position: "relative", overflow: "visible" }}>
       <FloralCorner position="tl" opacity={0.35} />
       <FloralCorner position="br" opacity={0.35} />
 
@@ -601,12 +601,29 @@ function TicketScreen({ data, contribute, onShowAfter, showAfter }) {
   const [savingPng, setSavingPng] = useState(false);
 
   const calendar = () => {
-    const start = "20260516T190000Z";
-    const end = "20260517T020000Z";
-    const ics = `BEGIN:VCALENDAR\nVERSION:2.0\nBEGIN:VEVENT\nSUMMARY:Pkay's 30th — Midnight Masquerade\nDTSTART:${start}\nDTEND:${end}\nLOCATION:${EVENT.venue}, ${EVENT.city}\nDESCRIPTION:Black tie. Mask required.\nEND:VEVENT\nEND:VCALENDAR`;
-    const blob = new Blob([ics], { type: "text/calendar" });
+    const lines = [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "PRODID:-//PKay30//EN",
+      "BEGIN:VEVENT",
+      "SUMMARY:Pkay's 30th — Midnight Masquerade",
+      "DTSTART:20260516T190000",
+      "DTEND:20260517T020000",
+      "LOCATION:" + EVENT.venue + "\\, " + EVENT.city,
+      "DESCRIPTION:Black tie + Masquerade Mask required. Doors close at 7:30 PM.",
+      "END:VEVENT",
+      "END:VCALENDAR",
+    ];
+    const ics = lines.join("\r\n");
+    const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url; a.download = "pkay-30.ics"; a.click();
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "pkay-30-masquerade.ics";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
   // Render the ticket to a PNG (used for download AND as the artwork inside the
@@ -794,23 +811,27 @@ function TicketScreen({ data, contribute, onShowAfter, showAfter }) {
     return canvas;
   };
 
-  const downloadPng = async () => {
+  const downloadPng = () => {
     setSavingPng(true);
-    try {
-      const canvas = await renderTicketCanvas();
-      canvas.toBlob((blob) => {
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `pkay-30-ticket-${code}.png`;
-        a.click();
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
-        setSavingPng(false);
-      }, "image/png");
-    } catch (e) {
-      console.error(e);
+    return renderTicketCanvas().then((canvas) => {
+      return new Promise((resolve) => {
+        canvas.toBlob((blob) => {
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `pkay-30-ticket-${code}.png`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          setTimeout(() => URL.revokeObjectURL(url), 1000);
+          setSavingPng(false);
+          resolve();
+        }, "image/png");
+      });
+    }).catch((e) => {
+      console.error("[pkay30] Ticket render error:", e);
       setSavingPng(false);
-    }
+    });
   };
 
   // Apple Wallet — a real .pkpass requires Apple-issued signing on a server.
@@ -911,6 +932,11 @@ function TicketScreen({ data, contribute, onShowAfter, showAfter }) {
             <div style={{ marginBottom: 16 }}>
               <div style={{ fontSize: 9, letterSpacing: "0.4em", color: "var(--gold)", textTransform: "uppercase", fontWeight: 600, marginBottom: 4 }}>GUEST</div>
               <div className="serif" style={{ fontSize: 28, color: "var(--ivory)", lineHeight: 1 }}>{data.name || "Guest"}</div>
+              {data.guestNames && data.guestNames.filter(Boolean).length > 0 && (
+                <div style={{ marginTop: 8, fontSize: 14, color: "var(--smoke)", fontFamily: "Cormorant Garamond, serif", fontStyle: "italic" }}>
+                  + {data.guestNames.filter(Boolean).join(", ")}
+                </div>
+              )}
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px 14px" }}>
