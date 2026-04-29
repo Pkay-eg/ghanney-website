@@ -85,9 +85,9 @@ function savePartialRSVP(data, stepReached) {
       partials.unshift(record);
     }
     localStorage.setItem(LS_PARTIAL_KEY, JSON.stringify(partials.slice(0, 500)));
-    // Save partial to Supabase (non-blocking). Only insert once per session (step 0).
+    // Save partial to Supabase once at step 1 (after name is entered)
     const sb = window.__supabase;
-    if (sb && stepReached === 0) {
+    if (sb && stepReached === 1 && data.name && data.name.trim()) {
       sb.from("rsvps").insert({
         session_id: sid,
         code: record.code || null,
