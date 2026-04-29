@@ -2,47 +2,12 @@
 const { useState: useState_crm, useEffect: useEffect_crm, useMemo: useMemo_crm } = React;
 
 // ── Configuration ─────────────────────────────────────────────
-// Set window.__SHEETS_ENDPOINT to a deployed Google Apps Script Web App URL.
-// The Apps Script (paste into a new "Containerized" script attached to a
-// Google Sheet) should look like:
-//
-//   const SHEET_NAME = "RSVPs";
-//   function doPost(e) {
-//     const ss = SpreadsheetApp.getActiveSpreadsheet();
-//     const sh = ss.getSheetByName(SHEET_NAME) || ss.insertSheet(SHEET_NAME);
-//     if (sh.getLastRow() === 0) {
-//       sh.appendRow(["Timestamp","Code","Name","Phone","Email",
-//                     "Attend","Guests","GuestNames","Message",
-//                     "Tier","Source"]);
-//     }
-//     const d = JSON.parse(e.postData.contents);
-//     sh.appendRow([
-//       new Date(), d.code||"", d.name||"", d.phone||"", d.email||"",
-//       d.attend||"", d.guests||"", (d.guestNames||[]).join(", "),
-//       d.message||"", d.tier||"", "pkay.ghanney.com"
-//     ]);
-//     return ContentService
-//       .createTextOutput(JSON.stringify({ok:true}))
-//       .setMimeType(ContentService.MimeType.JSON);
-//   }
-//   function doGet() {
-//     const ss = SpreadsheetApp.getActiveSpreadsheet();
-//     const sh = ss.getSheetByName(SHEET_NAME);
-//     if (!sh) return ContentService.createTextOutput(JSON.stringify({rows:[]}))
-//       .setMimeType(ContentService.MimeType.JSON);
-//     const v = sh.getDataRange().getValues();
-//     const [hdr, ...rows] = v;
-//     return ContentService.createTextOutput(JSON.stringify({
-//       rows: rows.map(r => Object.fromEntries(hdr.map((h,i)=>[h, r[i]])))
-//     })).setMimeType(ContentService.MimeType.JSON);
-//   }
-//
-// Deploy → New deployment → Web app → Execute as: Me, Anyone has access.
-// Then in your hosted index.html add:
-//   <script>window.__SHEETS_ENDPOINT="https://script.google.com/.../exec";</script>
-//
-// While developing or before the endpoint is set, submissions are stored in
-// localStorage so the CRM can still demonstrate the flow.
+// Supabase is used as the backend. The client is initialized in index.html:
+//   window.__supabase = supabase.createClient(URL, ANON_KEY);
+// Table: "rsvps" with columns: id, created_at, code, name, phone, email,
+//   attend, guests, guest_names, message, tier, type, step_reached, session_id, source
+// While developing or before Supabase is configured, submissions fall back
+// to localStorage so the CRM can still demonstrate the flow.
 
 const LS_KEY = "pkay30_rsvps_v1";
 const LS_PARTIAL_KEY = "pkay30_partials_v1";
@@ -120,14 +85,26 @@ function savePartialRSVP(data, stepReached) {
       partials.unshift(record);
     }
     localStorage.setItem(LS_PARTIAL_KEY, JSON.stringify(partials.slice(0, 500)));
-    // Also push to sheets if endpoint exists
-    const endpoint = window.__SHEETS_ENDPOINT;
-    if (endpoint) {
-      fetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({ ...record, _type: "partial" }),
-      }).catch(() => {});
+    // Upsert to Supabase (non-blocking)
+    const sb = window.__supabase;
+    if (sb) {
+      sb.from("rsvps").upsert({
+        session_id: sid,
+        code: record.code || null,
+        name: record.name || null,
+        phone: record.phone || null,
+        email: record.email || null,
+        attend: record.attend || null,
+        guests: Number(record.guests) || 0,
+        guest_names: Array.isArray(record.guestNames) ? record.guestNames.join(", ") : (record.guestNames || null),
+        message: record.message || null,
+        tier: record.tier || null,
+        type: "partial",
+        step_reached: stepReached,
+        source: "ghanney.com/pkay30",
+      }, { onConflict: "session_id" }).then(({ error }) => {
+        if (error) console.warn("Supabase partial upsert error:", error.message);
+      });
     }
   } catch (e) {}
 }
@@ -161,19 +138,36 @@ async function submitRSVP(payload) {
     cur.unshift(record);
     localStorage.setItem(LS_KEY, JSON.stringify(cur.slice(0, 500)));
   } catch (e) {}
-  const endpoint = window.__SHEETS_ENDPOINT;
-  if (!endpoint) {
+  const sb = window.__supabase;
+  if (!sb) {
     return { ok: true, mocked: true, record };
   }
   try {
-    const res = await fetch(endpoint, {
-      method: "POST",
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify(record),
-    });
-    return { ok: res.ok, record };
+    const row = {
+      session_id: payload._sessionId || null,
+      code: record.code || null,
+      name: record.name || null,
+      phone: record.phone || null,
+      email: record.email || null,
+      attend: record.attend || null,
+      guests: Number(record.guests) || 0,
+      guest_names: Array.isArray(record.guestNames) ? record.guestNames.join(", ") : (record.guestNames || null),
+      message: record.message || null,
+      tier: record.tier || null,
+      type: "completed",
+      step_reached: null,
+      source: "ghanney.com/pkay30",
+    };
+    const { error } = payload._sessionId
+      ? await sb.from("rsvps").upsert(row, { onConflict: "session_id" })
+      : await sb.from("rsvps").insert(row);
+    if (error) {
+      console.warn("Supabase submit error:", error.message);
+      return { ok: false, mocked: true, record, error: error.message };
+    }
+    return { ok: true, record };
   } catch (e) {
-    console.warn("Sheets submit failed; using local mirror.", e);
+    console.warn("Supabase submit failed; using local mirror.", e);
     return { ok: false, mocked: true, record, error: String(e) };
   }
 }
@@ -183,14 +177,16 @@ function loadLocalRSVPs() {
   catch (e) { return []; }
 }
 
-async function loadSheetRSVPs() {
-  const endpoint = window.__SHEETS_ENDPOINT;
-  if (!endpoint) return null;
+async function loadSupabaseRSVPs() {
+  const sb = window.__supabase;
+  if (!sb) return null;
   try {
-    const res = await fetch(endpoint);
-    if (!res.ok) return null;
-    const j = await res.json();
-    return j.rows || [];
+    const { data, error } = await sb
+      .from("rsvps")
+      .select("*")
+      .order("created_at", { ascending: false });
+    if (error) { console.warn("Supabase fetch error:", error.message); return null; }
+    return data || [];
   } catch (e) { return null; }
 }
 
@@ -504,48 +500,48 @@ function CRMView({ onClose }) {
 
   const refresh = React.useCallback(async () => {
     setLoading(true);
-    let completed = [];
+    let allRows = [];
     let src = "local";
 
-    const sheet = await loadSheetRSVPs();
-    if (sheet) {
-      completed = sheet.map(r => ({
-        ts: r.Timestamp || r.ts,
-        code: r.Code || r.code,
-        name: r.Name || r.name,
-        phone: r.Phone || r.phone,
-        email: r.Email || r.email,
-        attend: r.Attend || r.attend,
-        guests: r.Guests || r.guests,
-        guestNames: typeof r.GuestNames === "string" ? r.GuestNames.split(",").map(s=>s.trim()).filter(Boolean) : (r.guestNames || []),
-        message: r.Message || r.message,
-        tier: r.Tier || r.tier,
-        _status: "completed",
+    const sbData = await loadSupabaseRSVPs();
+    if (sbData) {
+      allRows = sbData.map(r => ({
+        ts: r.created_at,
+        code: r.code || "",
+        name: r.name || "",
+        phone: r.phone || "",
+        email: r.email || "",
+        attend: r.attend || "",
+        guests: r.guests || 1,
+        guestNames: r.guest_names ? r.guest_names.split(",").map(s => s.trim()).filter(Boolean) : [],
+        message: r.message || "",
+        tier: r.tier || "",
+        _status: r.type === "partial" ? "partial" : "completed",
+        _stepReached: r.step_reached,
       }));
-      src = "sheets";
+      src = "supabase";
     } else {
-      completed = loadLocalRSVPs().map(r => ({ ...r, _status: "completed" }));
+      const local = loadLocalRSVPs().map(r => ({ ...r, _status: "completed" }));
+      const partialList = loadPartialRSVPs().filter(p => !p._completed);
+      const partialRows = partialList.map(p => ({
+        ts: p._lastUpdate || p.ts,
+        code: "",
+        name: p.name || "",
+        phone: p.phone || "",
+        email: p.email || "",
+        attend: p.attend || "",
+        guests: p.guests || 1,
+        guestNames: p.guestNames || [],
+        message: p.message || "",
+        tier: "",
+        _status: "partial",
+        _stepReached: p._stepReached,
+      }));
+      allRows = [...partialRows, ...local];
       src = "local";
     }
 
-    // Also load incomplete partials and merge them into the view
-    const partialList = loadPartialRSVPs().filter(p => !p._completed);
-    const partialRows = partialList.map(p => ({
-      ts: p._lastUpdate || p.ts,
-      code: "",
-      name: p.name || "",
-      phone: p.phone || "",
-      email: p.email || "",
-      attend: p.attend || "",
-      guests: p.guests || 1,
-      guestNames: p.guestNames || [],
-      message: p.message || "",
-      tier: "",
-      _status: "partial",
-      _stepReached: p._stepReached,
-    }));
-
-    setRows([...partialRows, ...completed]);
+    setRows(allRows);
     setSource(src);
     setLoading(false);
   }, []);
@@ -628,7 +624,7 @@ function CRMView({ onClose }) {
               <span className="gold-text">Guest CRM</span>
             </h1>
             <div className="serif-italic" style={{ color: "var(--smoke)", fontSize: 17, marginTop: 4 }}>
-              Source: {source === "sheets" ? "Google Sheet (live)" : "Local mirror — set window.__SHEETS_ENDPOINT to go live"}
+              Source: {source === "supabase" ? "Supabase (live)" : "Local mirror — configure Supabase to go live"}
             </div>
           </div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
@@ -735,9 +731,7 @@ function CRMView({ onClose }) {
         </div>
 
         <div style={{ marginTop: 16, fontSize: 12, color: "var(--smoke)", lineHeight: 1.6, fontStyle: "italic", fontFamily: "Cormorant Garamond, serif", fontSize: 14 }}>
-          Tip: deploy the Apps Script in <code>crm.jsx</code> as a Web App, then add{" "}
-          <code style={{ color: "var(--gold)" }}>&lt;script&gt;window.__SHEETS_ENDPOINT="…"&lt;/script&gt;</code>{" "}
-          to your hosted page to mirror every RSVP into a Google Sheet automatically.
+          Data is stored in Supabase. All submissions (including partials) sync automatically.
         </div>
       </div>
 
@@ -983,7 +977,7 @@ function downloadTicketForGuest(guest) {
 }
 
 Object.assign(window, {
-  submitRSVP, loadLocalRSVPs, DressCodeBadge, StrictTimeStamp, CRMView,
+  submitRSVP, loadLocalRSVPs, loadSupabaseRSVPs, DressCodeBadge, StrictTimeStamp, CRMView,
   savePartialRSVP, markPartialComplete, generateSessionId, loadPartialRSVPs,
   initUsers, getSession, clearSession,
   generateTicketPng, downloadTicketForGuest,
