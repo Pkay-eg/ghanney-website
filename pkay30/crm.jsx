@@ -925,7 +925,7 @@ async function generateTicketPng(guest) {
 
   // Real QR code
   const qrVal = `PKAY30-${codeStr}-${name}`;
-  const qrGen = qrcode(0, "M");
+  const qrGen = window.qrcode(0, "M");
   qrGen.addData(qrVal);
   qrGen.make();
   const modCount = qrGen.getModuleCount();

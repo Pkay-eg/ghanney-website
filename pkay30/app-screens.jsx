@@ -449,7 +449,7 @@ const WALLETS = {
 
 function QrSquare({ value, size = 160, dark = "#0a0807" }) {
   const grid = useMemo(() => {
-    const qr = qrcode(0, "M");
+    const qr = window.qrcode(0, "M");
     qr.addData(value);
     qr.make();
     const count = qr.getModuleCount();
@@ -760,7 +760,7 @@ function TicketScreen({ data, contribute, onShowAfter, showAfter }) {
 
     // Real QR code
     const qrVal = `PKAY30-${code}-${data.name || ""}`;
-    const qrGen = qrcode(0, "M");
+    const qrGen = window.qrcode(0, "M");
     qrGen.addData(qrVal);
     qrGen.make();
     const modCount = qrGen.getModuleCount();
