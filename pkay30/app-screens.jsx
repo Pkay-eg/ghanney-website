@@ -585,7 +585,7 @@ function ContributeStep({ onNext, onBack, contribute, setContribute }) {
 // ─────────────────────────────────────────────────────────
 // 8. Confirmation / digital ticket
 // ─────────────────────────────────────────────────────────
-function TicketScreen({ data, contribute, onShowAfter, showAfter }) {
+function TicketScreen({ data, contribute, onShowAfter, showAfter, onEdit }) {
   const ticketRef = useRef(null);
   const code = useMemo(() => {
     const s = (data.name || "guest").toUpperCase().replace(/[^A-Z]/g, "").slice(0, 3) || "PKY";
@@ -1065,6 +1065,11 @@ function TicketScreen({ data, contribute, onShowAfter, showAfter }) {
           {showAfter && (
             <button className="btn-ghost" onClick={onShowAfter}>
               About the after-party →
+            </button>
+          )}
+          {onEdit && (
+            <button className="btn-ghost" onClick={onEdit} style={{ opacity: 0.7 }}>
+              Edit my details
             </button>
           )}
         </div>

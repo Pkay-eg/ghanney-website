@@ -208,7 +208,8 @@ function App() {
         )}
 
         {phase === "ticket" && (
-          <TicketScreen data={data} contribute={contribute} showAfter={t.showAfter} onShowAfter={goAfter} />
+          <TicketScreen data={data} contribute={contribute} showAfter={t.showAfter} onShowAfter={goAfter}
+            onEdit={() => { setPhase("rsvp"); setStep(1); window.scrollTo(0, 0); }} />
         )}
 
         {phase === "after" && (
