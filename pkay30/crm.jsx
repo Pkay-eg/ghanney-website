@@ -85,10 +85,10 @@ function savePartialRSVP(data, stepReached) {
       partials.unshift(record);
     }
     localStorage.setItem(LS_PARTIAL_KEY, JSON.stringify(partials.slice(0, 500)));
-    // Upsert to Supabase (non-blocking)
+    // Save partial to Supabase (non-blocking). Only insert once per session (step 0).
     const sb = window.__supabase;
-    if (sb) {
-      sb.from("rsvps").upsert({
+    if (sb && stepReached === 0) {
+      sb.from("rsvps").insert({
         session_id: sid,
         code: record.code || null,
         name: record.name || null,
@@ -102,8 +102,8 @@ function savePartialRSVP(data, stepReached) {
         type: "partial",
         step_reached: stepReached,
         source: "ghanney.com/pkay30",
-      }, { onConflict: "session_id" }).then(({ error }) => {
-        if (error) console.warn("Supabase partial upsert error:", error.message);
+      }).then(({ error }) => {
+        if (error) console.warn("[pkay30] Supabase partial insert:", error.message);
       });
     }
   } catch (e) {}
@@ -144,7 +144,6 @@ async function submitRSVP(payload) {
   }
   try {
     const row = {
-      session_id: payload._sessionId || null,
       code: record.code || null,
       name: record.name || null,
       phone: record.phone || null,
@@ -156,17 +155,13 @@ async function submitRSVP(payload) {
       tier: record.tier || null,
       type: "completed",
       step_reached: null,
+      session_id: (payload._sessionId || "") + "_done",
       source: "ghanney.com/pkay30",
     };
-    let result = payload._sessionId
-      ? await sb.from("rsvps").upsert(row, { onConflict: "session_id" })
-      : await sb.from("rsvps").insert(row);
-    if (result.error && payload._sessionId) {
-      result = await sb.from("rsvps").insert({ ...row, session_id: row.session_id + "_f" });
-    }
-    if (result.error) {
-      console.warn("Supabase submit error:", result.error.message);
-      return { ok: false, mocked: true, record, error: result.error.message };
+    const { error } = await sb.from("rsvps").insert(row);
+    if (error) {
+      console.warn("[pkay30] Supabase submit error:", error.message);
+      return { ok: false, mocked: true, record, error: error.message };
     }
     return { ok: true, record };
   } catch (e) {
