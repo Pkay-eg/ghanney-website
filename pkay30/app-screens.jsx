@@ -587,11 +587,11 @@ function ContributeStep({ onNext, onBack, contribute, setContribute }) {
 // ─────────────────────────────────────────────────────────
 function TicketScreen({ data, contribute, onShowAfter, showAfter, onEdit }) {
   const ticketRef = useRef(null);
-  const code = useMemo(() => {
+  const code = data.code || (() => {
     const s = (data.name || "guest").toUpperCase().replace(/[^A-Z]/g, "").slice(0, 3) || "PKY";
     const n = String(Math.floor(Math.random() * 900) + 100);
     return `MM-${s}-${n}`;
-  }, [data.name]);
+  })();
 
   // Mark partial as complete once ticket is shown
   useEffect(() => {

@@ -108,10 +108,20 @@ function App() {
   const [step, setStep] = useState(0);
   const [data, setData] = useState(() => ({
     name: "", phone: "", email: "", guests: 1, guestNames: [], message: "",
-    _sessionId: window.generateSessionId ? window.generateSessionId() : ("s_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 8))
+    _sessionId: window.generateSessionId ? window.generateSessionId() : ("s_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 8)),
+    code: "",
   }));
   const [contribute, setContribute] = useState({ tier: null });
   const [submitState, setSubmitState] = useState({ status: "idle" });
+
+  // Generate a stable ticket code once name is entered
+  useEffect(() => {
+    if (data.name && !data.code) {
+      const s = data.name.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 3) || "PKY";
+      const n = String(Math.floor(Math.random() * 900) + 100);
+      setData(prev => ({ ...prev, code: `MM-${s}-${n}` }));
+    }
+  }, [data.name]);
   const [musicOn, setMusicOn] = useState(t.music);
 
   useEffect(() => { setMusicOn(t.music); }, [t.music]);
@@ -138,7 +148,7 @@ function App() {
   const nextStep = async () => {
     if (step === 0 && data.attend === "no") {
       setSubmitState({ status: "sending" });
-      const r = await window.submitRSVP({ ...data, tier: contribute.tier, code: "" });
+      const r = await window.submitRSVP({ ...data, tier: contribute.tier });
       setSubmitState({ status: r.ok ? "ok" : "err", mocked: r.mocked });
       goRegrets(); return;
     }
