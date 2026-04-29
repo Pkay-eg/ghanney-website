@@ -158,12 +158,15 @@ async function submitRSVP(payload) {
       step_reached: null,
       source: "ghanney.com/pkay30",
     };
-    const { error } = payload._sessionId
+    let result = payload._sessionId
       ? await sb.from("rsvps").upsert(row, { onConflict: "session_id" })
       : await sb.from("rsvps").insert(row);
-    if (error) {
-      console.warn("Supabase submit error:", error.message);
-      return { ok: false, mocked: true, record, error: error.message };
+    if (result.error && payload._sessionId) {
+      result = await sb.from("rsvps").insert({ ...row, session_id: row.session_id + "_f" });
+    }
+    if (result.error) {
+      console.warn("Supabase submit error:", result.error.message);
+      return { ok: false, mocked: true, record, error: result.error.message };
     }
     return { ok: true, record };
   } catch (e) {
