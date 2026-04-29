@@ -32,7 +32,6 @@ const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
   "maskStyle": "ornate"
 }/*EDITMODE-END*/;
 
-// Ambient music — gentle synthesized pad via WebAudio so we don't need an mp3 asset.
 function useAmbient(on) {
   const ref = useRef(null);
   useEffect(() => {
@@ -51,14 +50,13 @@ function useAmbient(on) {
       master.gain.value = 0.0;
       master.gain.linearRampToValueAtTime(0.06, ctx.currentTime + 2);
       master.connect(ctx.destination);
-      const notes = [110, 138.59, 164.81, 220]; // A2 / C#3 / E3 / A3
+      const notes = [110, 138.59, 164.81, 220];
       const oscs = notes.map((f, i) => {
         const o = ctx.createOscillator();
         o.type = i === 3 ? "triangle" : "sine";
         o.frequency.value = f;
         const g = ctx.createGain();
         g.gain.value = 0.25;
-        // gentle LFO swell
         const lfo = ctx.createOscillator();
         lfo.frequency.value = 0.05 + i * 0.02;
         const lfoG = ctx.createGain();
@@ -82,13 +80,23 @@ function useAmbient(on) {
   }, [on]);
 }
 
+function SkipToTicket({ data, contribute, onDone }) {
+  useEffect(() => {
+    window.submitRSVP({ ...data, tier: contribute.tier }).then(() => onDone());
+  }, []);
+  return null;
+}
+
 function App() {
   const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
   const [phase, setPhase] = useState(
     typeof window !== "undefined" && /[?&]admin=1/.test(window.location.search) ? "admin" : "intro"
   );
-  const [step, setStep] = useState(0); // for rsvp flow
-  const [data, setData] = useState({ name: "", phone: "", email: "", guests: 1, guestNames: [], message: "" });
+  const [step, setStep] = useState(0);
+  const [data, setData] = useState(() => ({
+    name: "", phone: "", email: "", guests: 1, guestNames: [], message: "",
+    _sessionId: window.generateSessionId ? window.generateSessionId() : ("s_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 8))
+  }));
   const [contribute, setContribute] = useState({ tier: null });
   const [submitState, setSubmitState] = useState({ status: "idle" });
   const [musicOn, setMusicOn] = useState(t.music);
@@ -96,10 +104,16 @@ function App() {
   useEffect(() => { setMusicOn(t.music); }, [t.music]);
   useAmbient(musicOn);
 
-  // Apply palette
   useEffect(() => {
     document.documentElement.dataset.palette = t.palette;
   }, [t.palette]);
+
+  // Track partial progress on every meaningful change during RSVP
+  useEffect(() => {
+    if (phase === "rsvp" && window.savePartialRSVP) {
+      try { window.savePartialRSVP(data, step); } catch(e) { console.warn("partial save error", e); }
+    }
+  }, [phase, step, data.name, data.phone, data.email, data.attend, data.guests]);
 
   // Flow
   const goCover  = () => { setPhase("cover"); window.scrollTo(0, 0); };
@@ -110,19 +124,13 @@ function App() {
 
   const nextStep = async () => {
     if (step === 0 && data.attend === "no") {
-      // Submit the regret immediately
       setSubmitState({ status: "sending" });
-      const r = await submitRSVP({ ...data, tier: contribute.tier, code: "" });
+      const r = await window.submitRSVP({ ...data, tier: contribute.tier, code: "" });
       setSubmitState({ status: r.ok ? "ok" : "err", mocked: r.mocked });
       goRegrets(); return;
     }
-    if (step >= 4) {
-      // Final submit before showing ticket
-      setSubmitState({ status: "sending" });
-      const r = await submitRSVP({ ...data, tier: contribute.tier });
-      setSubmitState({ status: r.ok ? "ok" : "err", mocked: r.mocked });
-      goTicket(); return;
-    }
+    // Save partial before advancing
+    if (window.savePartialRSVP) window.savePartialRSVP(data, step + 1);
     setStep(step + 1);
     window.scrollTo(0, 0);
   };
@@ -174,8 +182,12 @@ function App() {
         )}
         {phase === "rsvp" && step === 4 && (
           t.showCrypto
-            ? <ContributeStep onNext={goTicket} onBack={backStep} contribute={contribute} setContribute={setContribute} />
-            : (() => { goTicket(); return null; })()
+            ? <ContributeStep onNext={async () => {
+                const r = await window.submitRSVP({ ...data, tier: contribute.tier });
+                setSubmitState({ status: r.ok ? "ok" : "err", mocked: r.mocked });
+                goTicket();
+              }} onBack={backStep} contribute={contribute} setContribute={setContribute} />
+            : <SkipToTicket data={data} contribute={contribute} onDone={goTicket} />
         )}
 
         {phase === "regrets" && (

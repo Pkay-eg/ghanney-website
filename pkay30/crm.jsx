@@ -45,10 +45,117 @@ const { useState: useState_crm, useEffect: useEffect_crm, useMemo: useMemo_crm }
 // localStorage so the CRM can still demonstrate the flow.
 
 const LS_KEY = "pkay30_rsvps_v1";
+const LS_PARTIAL_KEY = "pkay30_partials_v1";
+const LS_AUTH_KEY = "pkay30_auth_v1";
+const LS_USERS_KEY = "pkay30_users_v1";
+const LS_SESSION_KEY = "pkay30_session_v1";
 
+// ── Default admin credentials (SHA-256 hashed) ──────────────────
+// Default: username "admin", password "pkay2026"
+async function hashPassword(pw) {
+  const enc = new TextEncoder().encode(pw);
+  const buf = await crypto.subtle.digest("SHA-256", enc);
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
+const DEFAULT_USERS = [
+  { id: "u1", username: "admin", hash: "a]PLACEHOLDER[", role: "owner", created: "2026-04-29" },
+];
+
+function getUsers() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(LS_USERS_KEY));
+    if (stored && stored.length > 0) return stored;
+  } catch (e) {}
+  return null;
+}
+
+function saveUsers(users) {
+  localStorage.setItem(LS_USERS_KEY, JSON.stringify(users));
+}
+
+async function initUsers() {
+  if (!getUsers()) {
+    const hash = await hashPassword("pkay2026");
+    saveUsers([{ id: "u1", username: "admin", hash, role: "owner", created: new Date().toISOString().slice(0, 10) }]);
+  }
+}
+
+function getSession() {
+  try {
+    const s = JSON.parse(localStorage.getItem(LS_SESSION_KEY));
+    if (s && s.expires > Date.now()) return s;
+    localStorage.removeItem(LS_SESSION_KEY);
+  } catch (e) {}
+  return null;
+}
+
+function setSession(user) {
+  const s = { username: user.username, role: user.role, expires: Date.now() + 24 * 60 * 60 * 1000 };
+  localStorage.setItem(LS_SESSION_KEY, JSON.stringify(s));
+  return s;
+}
+
+function clearSession() {
+  localStorage.removeItem(LS_SESSION_KEY);
+}
+
+// ── Partial RSVP tracking ────────────────────────────────────────
+// Captures every step transition so even incomplete submissions are visible.
+function savePartialRSVP(data, stepReached) {
+  try {
+    const partials = JSON.parse(localStorage.getItem(LS_PARTIAL_KEY) || "[]");
+    const sid = data._sessionId;
+    const existing = partials.findIndex(p => p._sessionId === sid);
+    const record = {
+      ...data,
+      _sessionId: sid,
+      _stepReached: stepReached,
+      _lastUpdate: new Date().toISOString(),
+      _completed: false,
+    };
+    if (existing >= 0) {
+      partials[existing] = record;
+    } else {
+      partials.unshift(record);
+    }
+    localStorage.setItem(LS_PARTIAL_KEY, JSON.stringify(partials.slice(0, 500)));
+    // Also push to sheets if endpoint exists
+    const endpoint = window.__SHEETS_ENDPOINT;
+    if (endpoint) {
+      fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({ ...record, _type: "partial" }),
+      }).catch(() => {});
+    }
+  } catch (e) {}
+}
+
+function markPartialComplete(sessionId) {
+  try {
+    const partials = JSON.parse(localStorage.getItem(LS_PARTIAL_KEY) || "[]");
+    const idx = partials.findIndex(p => p._sessionId === sessionId);
+    if (idx >= 0) {
+      partials[idx]._completed = true;
+      localStorage.setItem(LS_PARTIAL_KEY, JSON.stringify(partials));
+    }
+  } catch (e) {}
+}
+
+function loadPartialRSVPs() {
+  try { return JSON.parse(localStorage.getItem(LS_PARTIAL_KEY) || "[]"); }
+  catch (e) { return []; }
+}
+
+function generateSessionId() {
+  return "s_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 8);
+}
+
+// ── Full RSVP submission ─────────────────────────────────────────
 async function submitRSVP(payload) {
   const record = { ...payload, ts: new Date().toISOString() };
-  // Always mirror to localStorage so the CRM has data even if Sheets is offline.
+  if (payload._sessionId) markPartialComplete(payload._sessionId);
   try {
     const cur = JSON.parse(localStorage.getItem(LS_KEY) || "[]");
     cur.unshift(record);
@@ -61,7 +168,6 @@ async function submitRSVP(payload) {
   try {
     const res = await fetch(endpoint, {
       method: "POST",
-      // Apps Script web-apps reject preflighted JSON; use text/plain to avoid CORS preflight.
       headers: { "Content-Type": "text/plain;charset=utf-8" },
       body: JSON.stringify(record),
     });
@@ -132,7 +238,7 @@ function DressCodeBadge({ compact = false }) {
             <span className="gold-text">Black Tie</span> + <span style={{ fontStyle: "italic" }}>Masquerade Mask</span>
           </div>
           <div style={{ fontSize: 11, color: "var(--smoke)", marginTop: 8, letterSpacing: "0.04em", lineHeight: 1.5, fontFamily: "Cormorant Garamond, serif", fontStyle: "italic", fontSize: 14 }}>
-            No mask · no entry. Dress for shadow & gold.
+            No mask · no entry. Masks will be provided on arrival for those without one.
           </div>
         </div>
       </div>
@@ -166,8 +272,229 @@ function StrictTimeStamp({ size = "md" }) {
   );
 }
 
+// ── Login Screen ─────────────────────────────────────────────
+function LoginScreen({ onSuccess }) {
+  const [username, setUsername] = useState_crm("");
+  const [password, setPassword] = useState_crm("");
+  const [error, setError] = useState_crm("");
+  const [loading, setLoading] = useState_crm(false);
+
+  React.useEffect(() => { initUsers(); }, []);
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+    const users = getUsers();
+    if (!users) { setError("No users configured."); setLoading(false); return; }
+    const hash = await hashPassword(password);
+    const user = users.find(u => u.username.toLowerCase() === username.toLowerCase() && u.hash === hash);
+    if (!user) { setError("Invalid username or password."); setLoading(false); return; }
+    const session = setSession(user);
+    setLoading(false);
+    onSuccess(session);
+  };
+
+  return (
+    <div style={{ minHeight: "100dvh", background: "var(--ink)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+      <div style={{ width: "100%", maxWidth: 380, textAlign: "center" }}>
+        <div style={{ width: 80, height: 52, margin: "0 auto 20px" }}>
+          <img src="assets/mask.svg" style={{ width: "100%", height: "100%", filter: "drop-shadow(0 0 20px rgba(201,165,92,0.4))" }} alt="" />
+        </div>
+        <div className="eyebrow" style={{ marginBottom: 8 }}>Admin Portal</div>
+        <h2 className="serif" style={{ fontSize: 36, margin: "0 0 6px" }}>
+          <span className="gold-text">Guest CRM</span>
+        </h2>
+        <div className="serif-italic" style={{ color: "var(--smoke)", fontSize: 16, marginBottom: 32 }}>
+          Sign in to manage RSVPs
+        </div>
+
+        <form onSubmit={handleLogin} style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+          <div style={{ textAlign: "left" }}>
+            <div className="field-label">Username</div>
+            <input className="field" type="text" placeholder="Enter username"
+              value={username} onChange={(e) => setUsername(e.target.value)}
+              autoComplete="username" autoFocus />
+          </div>
+          <div style={{ textAlign: "left" }}>
+            <div className="field-label">Password</div>
+            <input className="field" type="password" placeholder="Enter password"
+              value={password} onChange={(e) => setPassword(e.target.value)}
+              autoComplete="current-password" />
+          </div>
+
+          {error && (
+            <div style={{ padding: "10px 14px", borderRadius: 8, background: "rgba(217,60,60,0.15)", border: "1px solid rgba(217,60,60,0.4)", color: "#d97777", fontSize: 13, textAlign: "left" }}>
+              {error}
+            </div>
+          )}
+
+          <button className="btn-gold" type="submit" disabled={loading || !username || !password}
+            style={{ marginTop: 8 }}>
+            {loading ? "Verifying…" : "Sign In"}
+          </button>
+        </form>
+
+        <div style={{ marginTop: 24, fontSize: 11, color: "var(--gold-deep)", letterSpacing: "0.2em" }}>
+          PKAY · 30TH · ESTILO DE VIDA
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── User Management Panel ────────────────────────────────────
+function UserManagement({ currentUser, onBack }) {
+  const [users, setUsersState] = useState_crm(getUsers() || []);
+  const [newUser, setNewUser] = useState_crm("");
+  const [newPass, setNewPass] = useState_crm("");
+  const [newRole, setNewRole] = useState_crm("admin");
+  const [msg, setMsg] = useState_crm("");
+
+  const addUser = async (e) => {
+    e.preventDefault();
+    if (!newUser.trim() || !newPass.trim()) return;
+    const existing = users.find(u => u.username.toLowerCase() === newUser.toLowerCase());
+    if (existing) { setMsg("Username already exists."); return; }
+    const hash = await hashPassword(newPass);
+    const updated = [...users, {
+      id: "u" + Date.now().toString(36),
+      username: newUser.trim(),
+      hash,
+      role: newRole,
+      created: new Date().toISOString().slice(0, 10),
+    }];
+    saveUsers(updated);
+    setUsersState(updated);
+    setNewUser(""); setNewPass("");
+    setMsg("User added successfully.");
+    setTimeout(() => setMsg(""), 3000);
+  };
+
+  const removeUser = (id) => {
+    if (!confirm("Remove this user?")) return;
+    const updated = users.filter(u => u.id !== id);
+    saveUsers(updated);
+    setUsersState(updated);
+  };
+
+  const resetPassword = async (id) => {
+    const pw = prompt("Enter new password for this user:");
+    if (!pw) return;
+    const hash = await hashPassword(pw);
+    const updated = users.map(u => u.id === id ? { ...u, hash } : u);
+    saveUsers(updated);
+    setUsersState(updated);
+    setMsg("Password reset successfully.");
+    setTimeout(() => setMsg(""), 3000);
+  };
+
+  return (
+    <div style={{ minHeight: "100dvh", background: "var(--ink)", color: "var(--ivory)", padding: "24px 20px 60px" }}>
+      <div style={{ maxWidth: 700, margin: "0 auto" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24 }}>
+          <div>
+            <div className="eyebrow">Admin</div>
+            <h2 className="serif" style={{ fontSize: 32, margin: "6px 0 0" }}>
+              <span className="gold-text">User Management</span>
+            </h2>
+          </div>
+          <button className="btn-ghost" onClick={onBack}>← Back to CRM</button>
+        </div>
+
+        {msg && (
+          <div style={{ marginBottom: 16, padding: "10px 14px", borderRadius: 8, background: "rgba(106,217,154,0.12)", border: "1px solid rgba(106,217,154,0.4)", color: "#6ad99a", fontSize: 13 }}>
+            {msg}
+          </div>
+        )}
+
+        {/* Existing users */}
+        <div style={{ border: "1px solid var(--hair)", borderRadius: 12, overflow: "hidden", background: "var(--ink-2)", marginBottom: 28 }}>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
+              <tr style={{ background: "rgba(0,0,0,0.4)" }}>
+                <th style={{ padding: "12px 14px", textAlign: "left", fontSize: 10, letterSpacing: "0.24em", textTransform: "uppercase", color: "var(--gold-deep)", fontWeight: 600 }}>Username</th>
+                <th style={{ padding: "12px 14px", textAlign: "left", fontSize: 10, letterSpacing: "0.24em", textTransform: "uppercase", color: "var(--gold-deep)", fontWeight: 600 }}>Role</th>
+                <th style={{ padding: "12px 14px", textAlign: "left", fontSize: 10, letterSpacing: "0.24em", textTransform: "uppercase", color: "var(--gold-deep)", fontWeight: 600 }}>Created</th>
+                <th style={{ padding: "12px 14px", textAlign: "right", fontSize: 10, letterSpacing: "0.24em", textTransform: "uppercase", color: "var(--gold-deep)", fontWeight: 600 }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {users.map(u => (
+                <tr key={u.id} style={{ borderTop: "1px solid var(--hair)" }}>
+                  <td style={{ padding: "14px", fontSize: 15 }}>
+                    <span className="serif" style={{ color: "var(--ivory)" }}>{u.username}</span>
+                    {u.username === currentUser.username && <span style={{ marginLeft: 8, fontSize: 10, color: "var(--gold)", letterSpacing: "0.2em" }}>(YOU)</span>}
+                  </td>
+                  <td style={{ padding: "14px" }}>
+                    <span style={{ padding: "3px 10px", borderRadius: 999, fontSize: 10, letterSpacing: "0.2em", textTransform: "uppercase", fontWeight: 600, background: u.role === "owner" ? "rgba(201,165,92,0.18)" : "rgba(244,234,212,0.08)", color: u.role === "owner" ? "var(--gold)" : "var(--smoke)", border: `1px solid ${u.role === "owner" ? "var(--gold)" : "var(--hair)"}` }}>
+                      {u.role}
+                    </span>
+                  </td>
+                  <td style={{ padding: "14px", fontSize: 13, color: "var(--smoke)" }}>{u.created}</td>
+                  <td style={{ padding: "14px", textAlign: "right" }}>
+                    <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                      <button onClick={() => resetPassword(u.id)}
+                        style={{ appearance: "none", background: "rgba(244,234,212,0.06)", border: "1px solid var(--hair)", borderRadius: 6, color: "var(--ivory)", fontSize: 11, padding: "6px 10px", cursor: "pointer" }}>
+                        Reset PW
+                      </button>
+                      {u.role !== "owner" && (
+                        <button onClick={() => removeUser(u.id)}
+                          style={{ appearance: "none", background: "rgba(217,60,60,0.1)", border: "1px solid rgba(217,60,60,0.3)", borderRadius: 6, color: "#d97777", fontSize: 11, padding: "6px 10px", cursor: "pointer" }}>
+                          Remove
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Add new user form */}
+        <div className="card-velvet" style={{ padding: 22 }}>
+          <div className="eyebrow" style={{ marginBottom: 16 }}>Add New User</div>
+          <form onSubmit={addUser} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+              <div>
+                <div className="field-label">Username</div>
+                <input className="field" placeholder="username" value={newUser}
+                  onChange={(e) => setNewUser(e.target.value)} />
+              </div>
+              <div>
+                <div className="field-label">Password</div>
+                <input className="field" type="password" placeholder="password" value={newPass}
+                  onChange={(e) => setNewPass(e.target.value)} />
+              </div>
+            </div>
+            <div>
+              <div className="field-label">Role</div>
+              <div style={{ display: "flex", gap: 10, marginTop: 6 }}>
+                {["admin", "viewer"].map(r => (
+                  <div key={r} className="choice" data-selected={newRole === r}
+                    onClick={() => setNewRole(r)}
+                    style={{ flex: 1, padding: "12px 16px", justifyContent: "center" }}>
+                    <span style={{ fontSize: 12, letterSpacing: "0.18em", textTransform: "uppercase" }}>{r}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <button className="btn-gold" type="submit" disabled={!newUser.trim() || !newPass.trim()}>
+              Add User
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── CRM Admin View ───────────────────────────────────────────
 function CRMView({ onClose }) {
+  const [authed, setAuthed] = useState_crm(!!getSession());
+  const [session, setSessionState] = useState_crm(getSession());
+  const [view, setView] = useState_crm("crm");
   const [rows, setRows] = useState_crm([]);
   const [source, setSource] = useState_crm("local");
   const [filter, setFilter] = useState_crm("all");
@@ -175,12 +502,14 @@ function CRMView({ onClose }) {
   const [loading, setLoading] = useState_crm(false);
   const [selected, setSelected] = useState_crm(null);
 
-  const refresh = async () => {
+  const refresh = React.useCallback(async () => {
     setLoading(true);
+    let completed = [];
+    let src = "local";
+
     const sheet = await loadSheetRSVPs();
     if (sheet) {
-      // Normalize sheet rows (Apps Script returns object keyed by header)
-      setRows(sheet.map(r => ({
+      completed = sheet.map(r => ({
         ts: r.Timestamp || r.ts,
         code: r.Code || r.code,
         name: r.Name || r.name,
@@ -191,19 +520,40 @@ function CRMView({ onClose }) {
         guestNames: typeof r.GuestNames === "string" ? r.GuestNames.split(",").map(s=>s.trim()).filter(Boolean) : (r.guestNames || []),
         message: r.Message || r.message,
         tier: r.Tier || r.tier,
-      })));
-      setSource("sheets");
+        _status: "completed",
+      }));
+      src = "sheets";
     } else {
-      setRows(loadLocalRSVPs());
-      setSource("local");
+      completed = loadLocalRSVPs().map(r => ({ ...r, _status: "completed" }));
+      src = "local";
     }
+
+    // Also load incomplete partials and merge them into the view
+    const partialList = loadPartialRSVPs().filter(p => !p._completed);
+    const partialRows = partialList.map(p => ({
+      ts: p._lastUpdate || p.ts,
+      code: "",
+      name: p.name || "",
+      phone: p.phone || "",
+      email: p.email || "",
+      attend: p.attend || "",
+      guests: p.guests || 1,
+      guestNames: p.guestNames || [],
+      message: p.message || "",
+      tier: "",
+      _status: "partial",
+      _stepReached: p._stepReached,
+    }));
+
+    setRows([...partialRows, ...completed]);
+    setSource(src);
     setLoading(false);
-  };
-  useEffect_crm(() => { refresh(); }, []);
+  }, []);
 
   const filtered = useMemo_crm(() => {
     return rows.filter(r => {
-      if (filter !== "all" && r.attend !== filter) return false;
+      if (filter === "partial" && r._status !== "partial") return false;
+      else if (filter !== "all" && filter !== "partial" && r.attend !== filter) return false;
       if (query) {
         const q = query.toLowerCase();
         const hay = `${r.name||""} ${r.phone||""} ${r.email||""} ${r.message||""} ${r.code||""}`.toLowerCase();
@@ -214,15 +564,31 @@ function CRMView({ onClose }) {
   }, [rows, filter, query]);
 
   const stats = useMemo_crm(() => {
-    let yes = 0, no = 0, maybe = 0, heads = 0, tier = 0;
+    let yes = 0, no = 0, maybe = 0, heads = 0, tier = 0, partial = 0;
     rows.forEach(r => {
+      if (r._status === "partial") { partial++; return; }
       if (r.attend === "yes") { yes++; heads += Number(r.guests || 1); }
       else if (r.attend === "no") no++;
       else if (r.attend === "maybe") { maybe++; heads += Number(r.guests || 1); }
       tier += Number(r.tier || 0);
     });
-    return { yes, no, maybe, heads, tier, total: rows.length };
+    return { yes, no, maybe, heads, tier, total: rows.length, partial };
   }, [rows]);
+
+  const STEP_LABELS = ["Opened RSVP", "Chose attendance", "Entered details", "Set guests", "Wrote message", "Contribution"];
+
+  useEffect_crm(() => { initUsers(); }, []);
+  useEffect_crm(() => { if (authed) refresh(); }, [authed]);
+
+  const logout = () => { clearSession(); setAuthed(false); setSessionState(null); };
+
+  if (!authed) {
+    return <LoginScreen onSuccess={(s) => { setAuthed(true); setSessionState(s); }} />;
+  }
+
+  if (view === "users") {
+    return <UserManagement currentUser={session} onBack={() => setView("crm")} />;
+  }
 
   const exportCsv = () => {
     const cols = ["ts","code","name","phone","email","attend","guests","guestNames","message","tier"];
@@ -265,9 +631,16 @@ function CRMView({ onClose }) {
               Source: {source === "sheets" ? "Google Sheet (live)" : "Local mirror — set window.__SHEETS_ENDPOINT to go live"}
             </div>
           </div>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+            <span style={{ fontSize: 11, color: "var(--gold-deep)", letterSpacing: "0.18em", marginRight: 4 }}>
+              {session?.username}
+            </span>
             <button className="btn-ghost" onClick={refresh} disabled={loading}>{loading ? "…" : "Refresh"}</button>
             <button className="btn-ghost" onClick={exportCsv}>Export CSV</button>
+            {session?.role === "owner" && (
+              <button className="btn-ghost" onClick={() => setView("users")}>Users</button>
+            )}
+            <button className="btn-ghost" onClick={logout}>Logout</button>
             <button className="btn-ghost" onClick={onClose}>← Back to site</button>
           </div>
         </div>
@@ -275,10 +648,11 @@ function CRMView({ onClose }) {
         {/* Stats */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginBottom: 22 }}>
           {[
-            { l: "Total RSVPs", v: stats.total },
+            { l: "Total entries", v: stats.total },
             { l: "Coming", v: stats.yes, c: "var(--gold)" },
             { l: "Maybes", v: stats.maybe },
             { l: "Regrets", v: stats.no },
+            { l: "Incomplete", v: stats.partial, c: "#fbbc05" },
             { l: "Head count", v: stats.heads, c: "var(--gold-bright)" },
             { l: "Pledged ₵", v: stats.tier.toLocaleString(), c: "var(--gold-bright)" },
           ].map((s, i) => (
@@ -296,6 +670,7 @@ function CRMView({ onClose }) {
             { id: "yes", l: "Coming" },
             { id: "maybe", l: "Maybe" },
             { id: "no", l: "Regrets" },
+            { id: "partial", l: "Incomplete" },
           ].map(f => (
             <button key={f.id} onClick={() => setFilter(f.id)} style={{
               appearance: "none", cursor: "pointer", padding: "8px 16px", borderRadius: 999,
@@ -336,9 +711,15 @@ function CRMView({ onClose }) {
                     <div style={{ fontSize: 11, color: "var(--gold-deep)" }}>{r.email || ""}</div>
                   </td>
                   <td>
-                    <span className={`crm-pill pill-${r.attend || "maybe"}`}>
-                      {r.attend === "yes" ? "Coming" : r.attend === "no" ? "Regrets" : "Maybe"}
-                    </span>
+                    {r._status === "partial" ? (
+                      <span className="crm-pill" style={{ background: "rgba(251,188,5,0.15)", color: "#fbbc05", border: "1px solid rgba(251,188,5,0.4)" }}>
+                        {STEP_LABELS[r._stepReached] || "Started"}
+                      </span>
+                    ) : (
+                      <span className={`crm-pill pill-${r.attend || "maybe"}`}>
+                        {r.attend === "yes" ? "Coming" : r.attend === "no" ? "Regrets" : "Maybe"}
+                      </span>
+                    )}
                   </td>
                   <td className="serif" style={{ fontSize: 18 }}>{r.guests || 1}</td>
                   <td style={{ fontFamily: "ui-monospace, Menlo, monospace", fontSize: 12 }}>{r.phone || "—"}</td>
@@ -394,7 +775,16 @@ function CRMView({ onClose }) {
                 </div>
               </div>
             )}
-            <button className="btn-gold" onClick={() => setSelected(null)} style={{ marginTop: 18, width: "100%" }}>Close</button>
+            <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
+              <button className="btn-gold" style={{ flex: 1 }}
+                onClick={() => downloadTicketForGuest(selected)}>
+                Regenerate Ticket
+              </button>
+              <button className="btn-ghost" style={{ flex: 1 }}
+                onClick={() => setSelected(null)}>
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -402,4 +792,199 @@ function CRMView({ onClose }) {
   );
 }
 
-Object.assign(window, { submitRSVP, loadLocalRSVPs, DressCodeBadge, StrictTimeStamp, CRMView });
+// ── Ticket Generator (reusable from CRM) ────────────────────
+async function generateTicketPng(guest) {
+  const name = guest.name || "Guest";
+  const guests = guest.guests || 1;
+  const codeStr = guest.code || (() => {
+    const s = name.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 3) || "PKY";
+    const n = String(Math.floor(Math.random() * 900) + 100);
+    return `MM-${s}-${n}`;
+  })();
+
+  const W = 1080, H = 1920;
+  const canvas = document.createElement("canvas");
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext("2d");
+  const PAD = 80;
+
+  const bg = ctx.createLinearGradient(0, 0, 0, H);
+  bg.addColorStop(0, "#0f0a08");
+  bg.addColorStop(0.3, "#1a0e0a");
+  bg.addColorStop(0.7, "#0d0907");
+  bg.addColorStop(1, "#080604");
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+
+  const glow = ctx.createRadialGradient(W/2, 200, 0, W/2, 200, 500);
+  glow.addColorStop(0, "rgba(201,165,92,0.2)");
+  glow.addColorStop(1, "transparent");
+  ctx.fillStyle = glow; ctx.fillRect(0, 0, W, 600);
+
+  const drawRoundRect = (x, y, w, h, r) => {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y); ctx.lineTo(x + w - r, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+  };
+
+  drawRoundRect(PAD, PAD, W - PAD*2, H - PAD*2, 32);
+  ctx.strokeStyle = "rgba(201,165,92,0.5)";
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  drawRoundRect(PAD + 16, PAD + 16, W - PAD*2 - 32, H - PAD*2 - 32, 24);
+  ctx.strokeStyle = "rgba(201,165,92,0.15)";
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  let y = 180;
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#c9a55c";
+  ctx.font = "600 20px Manrope, sans-serif";
+  ctx.fillText("P K A Y  ·  3 0 T H", W/2, y);
+
+  y += 100;
+  ctx.font = "italic 500 140px 'Cormorant Garamond', serif";
+  const goldGrad = ctx.createLinearGradient(0, y - 80, 0, y + 60);
+  goldGrad.addColorStop(0, "#f5dba0");
+  goldGrad.addColorStop(0.5, "#c9a55c");
+  goldGrad.addColorStop(1, "#8a6530");
+  ctx.fillStyle = goldGrad;
+  ctx.fillText("Midnight", W/2, y);
+
+  y += 110;
+  ctx.font = "italic 400 120px 'Italiana', serif";
+  ctx.fillStyle = "#f4ead4";
+  ctx.fillText("Masquerade", W/2, y);
+
+  try {
+    const img = new Image();
+    img.src = "assets/mask.svg";
+    await new Promise((res) => { img.onload = res; img.onerror = res; setTimeout(res, 600); });
+    const mw = 260, mh = mw * 0.63;
+    ctx.globalAlpha = 0.9;
+    ctx.drawImage(img, (W - mw)/2, y + 40, mw, mh);
+    ctx.globalAlpha = 1;
+  } catch(e) {}
+
+  const tearY = 620;
+  ctx.setLineDash([10, 10]);
+  ctx.strokeStyle = "rgba(201,165,92,0.35)";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(PAD + 40, tearY); ctx.lineTo(W - PAD - 40, tearY); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = "#0f0a08";
+  ctx.beginPath(); ctx.arc(PAD, tearY, 18, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(W - PAD, tearY, 18, 0, Math.PI * 2); ctx.fill();
+
+  y = tearY + 70;
+  const leftCol = 160;
+  const rightCol = W/2 + 40;
+
+  const drawField = (label, value, x, fy) => {
+    ctx.textAlign = "left";
+    ctx.fillStyle = "rgba(201,165,92,0.7)";
+    ctx.font = "600 16px Manrope, sans-serif";
+    ctx.fillText(label, x, fy);
+    ctx.fillStyle = "#f4ead4";
+    ctx.font = "500 38px 'Cormorant Garamond', serif";
+    ctx.fillText(value, x, fy + 48);
+  };
+
+  drawField("GUEST", name.toUpperCase(), leftCol, y);
+  drawField("ADMIT", String(guests), rightCol, y);
+  y += 120;
+  drawField("DATE", "16 MAY 2026", leftCol, y);
+  drawField("TIME", "7:00 PM SHARP", rightCol, y);
+  y += 120;
+  drawField("VENUE", "ENCLAVE GARDEN", leftCol, y);
+  drawField("DRESS", "BLACK TIE · MASK", rightCol, y);
+
+  y += 100;
+  ctx.setLineDash([6, 8]);
+  ctx.strokeStyle = "rgba(201,165,92,0.3)";
+  ctx.beginPath(); ctx.moveTo(leftCol, y); ctx.lineTo(W - leftCol, y); ctx.stroke();
+  ctx.setLineDash([]);
+
+  y += 60;
+  ctx.textAlign = "center";
+  ctx.fillStyle = "rgba(201,165,92,0.5)";
+  ctx.font = "600 14px Manrope, sans-serif";
+  ctx.fillText("TICKET CODE", W/2, y);
+  y += 44;
+  ctx.fillStyle = "#c9a55c";
+  ctx.font = "500 32px ui-monospace, Menlo, monospace";
+  ctx.fillText(codeStr, W/2, y);
+
+  y += 60;
+  const qrSize = 240;
+  const qrX = (W - qrSize) / 2;
+  const qrY = y;
+
+  ctx.fillStyle = "#faf3e3";
+  drawRoundRect(qrX - 20, qrY - 20, qrSize + 40, qrSize + 40, 12);
+  ctx.fill();
+
+  let hash = 0;
+  const val = `PKAY30-${codeStr}-${name}`;
+  for (let i = 0; i < val.length; i++) hash = (hash * 131 + val.charCodeAt(i)) >>> 0;
+  let seed = hash || 1;
+  const rand = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 0xffffffff; };
+  const N = 25, cellSz = qrSize / N;
+  ctx.fillStyle = "#1a0e0a";
+  for (let yy = 0; yy < N; yy++) {
+    for (let xx = 0; xx < N; xx++) {
+      const inFinder = (xx < 7 && yy < 7) || (xx >= N - 7 && yy < 7) || (xx < 7 && yy >= N - 7);
+      let on = false;
+      if (inFinder) {
+        const fx = xx < 7 ? xx : xx - (N - 7);
+        const fy = yy < 7 ? yy : yy - (N - 7);
+        on = (fx === 0 || fx === 6 || fy === 0 || fy === 6) || (fx >= 2 && fx <= 4 && fy >= 2 && fy <= 4);
+      } else { on = rand() > 0.48; }
+      if (on) ctx.fillRect(qrX + xx * cellSz, qrY + yy * cellSz, cellSz - 0.5, cellSz - 0.5);
+    }
+  }
+
+  y = qrY + qrSize + 50;
+  ctx.textAlign = "center";
+  ctx.fillStyle = "rgba(201,165,92,0.5)";
+  ctx.font = "600 14px Manrope, sans-serif";
+  ctx.fillText("SCAN AT ENTRY", W/2, y);
+
+  y = H - 180;
+  ctx.fillStyle = "rgba(201,165,92,0.4)";
+  ctx.font = "600 14px Manrope, sans-serif";
+  ctx.fillText("C U R A T E D   B Y   E S T I L O   D E   V I D A", W/2, y);
+  y += 50;
+  ctx.fillStyle = "rgba(244,234,212,0.6)";
+  ctx.font = "italic 400 28px 'Cormorant Garamond', serif";
+  ctx.fillText("Until then — keep the secret.", W/2, y);
+
+  return new Promise((resolve) => {
+    canvas.toBlob((blob) => resolve({ blob, code: codeStr, canvas }), "image/png");
+  });
+}
+
+function downloadTicketForGuest(guest) {
+  generateTicketPng(guest).then(({ blob, code }) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `pkay-30-ticket-${code}.png`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  });
+}
+
+Object.assign(window, {
+  submitRSVP, loadLocalRSVPs, DressCodeBadge, StrictTimeStamp, CRMView,
+  savePartialRSVP, markPartialComplete, generateSessionId, loadPartialRSVPs,
+  initUsers, getSession, clearSession,
+  generateTicketPng, downloadTicketForGuest,
+});

@@ -444,8 +444,8 @@ function MessageStep({ data, setData, onNext, onBack }) {
 // 7. Contribution / gift step
 // ─────────────────────────────────────────────────────────
 const WALLETS = {
-  btc: "TZ53BeAgGAKkJHpxg9kV36zwSYXcrEGkie",
-  eth: "0xd13E08a72fbE608005fFEB77b18C8ff4761161f0",
+  trc: "TZ53BeAgGAKkJHpxg9kV36zwSYXcrEGkie",
+  erc: "0xd13E08a72fbE608005fFEB77b18C8ff4761161f0",
 };
 
 function QrSquare({ value, size = 160, dark = "#0a0807" }) {
@@ -569,8 +569,8 @@ function ContributeStep({ onNext, onBack, contribute, setContribute }) {
       {tab === "crypto" && (
         <div className="fade-in" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           {[
-            { id: "btc", label: "Bitcoin (BTC)", addr: WALLETS.btc, hint: "BTC network" },
-            { id: "eth", label: "Ethereum / USDC", addr: WALLETS.eth, hint: "ERC-20 · Ethereum network" },
+            { id: "trc", label: "USDT (TRC20)", addr: WALLETS.trc, hint: "Tron network" },
+            { id: "erc", label: "USDT (ERC20 / BEP20)", addr: WALLETS.erc, hint: "Ethereum / BSC network" },
           ].map(w => (
             <div key={w.id} className="card-velvet" style={{ padding: 20 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
@@ -611,6 +611,11 @@ function TicketScreen({ data, contribute, onShowAfter, showAfter }) {
     return `MM-${s}-${n}`;
   }, [data.name]);
 
+  // Mark partial as complete once ticket is shown
+  useEffect(() => {
+    if (data._sessionId && window.markPartialComplete) window.markPartialComplete(data._sessionId);
+  }, []);
+
   const [savingPng, setSavingPng] = useState(false);
 
   const calendar = () => {
@@ -625,144 +630,191 @@ function TicketScreen({ data, contribute, onShowAfter, showAfter }) {
   // Render the ticket to a PNG (used for download AND as the artwork inside the
   // .pkpass / Google Wallet bundle since we can't sign real wallet passes client-side)
   const renderTicketCanvas = async () => {
-    const W = 1080, H = 1700;
+    const W = 1080, H = 1920;
     const canvas = document.createElement("canvas");
     canvas.width = W; canvas.height = H;
     const ctx = canvas.getContext("2d");
+    const PAD = 80;
 
-    // Background gradient
+    // Rich background with subtle warm gradient
     const bg = ctx.createLinearGradient(0, 0, 0, H);
-    bg.addColorStop(0, "#1a0608");
-    bg.addColorStop(0.5, "#0a0807");
-    bg.addColorStop(1, "#14100e");
+    bg.addColorStop(0, "#0f0a08");
+    bg.addColorStop(0.3, "#1a0e0a");
+    bg.addColorStop(0.7, "#0d0907");
+    bg.addColorStop(1, "#080604");
     ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
 
-    // Glow
-    const glow = ctx.createRadialGradient(W/2, H*0.25, 50, W/2, H*0.25, W*0.7);
-    glow.addColorStop(0, "rgba(201,165,92,0.3)");
-    glow.addColorStop(1, "rgba(201,165,92,0)");
-    ctx.fillStyle = glow; ctx.fillRect(0, 0, W, H);
+    // Top glow
+    const glow = ctx.createRadialGradient(W/2, 200, 0, W/2, 200, 500);
+    glow.addColorStop(0, "rgba(201,165,92,0.2)");
+    glow.addColorStop(1, "transparent");
+    ctx.fillStyle = glow; ctx.fillRect(0, 0, W, 600);
 
-    // Border frame
-    ctx.strokeStyle = "rgba(201,165,92,0.55)";
-    ctx.lineWidth = 2;
-    ctx.strokeRect(48, 48, W - 96, H - 96);
-    ctx.strokeStyle = "rgba(201,165,92,0.25)";
-    ctx.strokeRect(64, 64, W - 128, H - 128);
-
-    const gold = (s) => {
-      const g = ctx.createLinearGradient(0, 0, 0, s);
-      g.addColorStop(0, "#f0d28e");
-      g.addColorStop(0.5, "#c9a55c");
-      g.addColorStop(1, "#7a5a28");
-      return g;
+    // Outer border
+    const drawRoundRect = (x, y, w, h, r) => {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y); ctx.lineTo(x + w - r, y);
+      ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+      ctx.lineTo(x + w, y + h - r);
+      ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+      ctx.lineTo(x + r, y + h);
+      ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+      ctx.lineTo(x, y + r);
+      ctx.quadraticCurveTo(x, y, x + r, y);
+      ctx.closePath();
     };
+    drawRoundRect(PAD, PAD, W - PAD*2, H - PAD*2, 32);
+    ctx.strokeStyle = "rgba(201,165,92,0.5)";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Inner decorative border
+    drawRoundRect(PAD + 16, PAD + 16, W - PAD*2 - 32, H - PAD*2 - 32, 24);
+    ctx.strokeStyle = "rgba(201,165,92,0.15)";
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // ── TOP SECTION ──
+    let y = 180;
+    ctx.textAlign = "center";
 
     // Eyebrow
     ctx.fillStyle = "#c9a55c";
-    ctx.font = "500 24px Manrope, sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText("PKAY · 30TH", W/2, 180);
+    ctx.font = "600 20px Manrope, sans-serif";
+    ctx.letterSpacing = "8px";
+    ctx.fillText("P K A Y  ·  3 0 T H", W/2, y);
 
     // Title
-    ctx.font = "italic 500 130px 'Cormorant Garamond', serif";
-    ctx.fillStyle = gold(180);
-    ctx.fillText("Midnight", W/2, 320);
-    ctx.fillStyle = "#f4ead4";
-    ctx.font = "italic 400 110px 'Italiana', serif";
-    ctx.fillText("Masquerade", W/2, 440);
+    y += 100;
+    ctx.font = "italic 500 140px 'Cormorant Garamond', serif";
+    const goldGrad = ctx.createLinearGradient(0, y - 80, 0, y + 60);
+    goldGrad.addColorStop(0, "#f5dba0");
+    goldGrad.addColorStop(0.5, "#c9a55c");
+    goldGrad.addColorStop(1, "#8a6530");
+    ctx.fillStyle = goldGrad;
+    ctx.fillText("Midnight", W/2, y);
 
-    // Mask image
+    y += 110;
+    ctx.font = "italic 400 120px 'Italiana', serif";
+    ctx.fillStyle = "#f4ead4";
+    ctx.fillText("Masquerade", W/2, y);
+
+    // Mask
     try {
       const img = new Image();
       img.src = "assets/mask.svg";
-      await new Promise((res, rej) => { img.onload = res; img.onerror = res; setTimeout(res, 600); });
-      const mw = 360, mh = mw * (380/600);
-      ctx.globalAlpha = 0.95;
-      ctx.drawImage(img, (W - mw)/2, 500, mw, mh);
+      await new Promise((res) => { img.onload = res; img.onerror = res; setTimeout(res, 600); });
+      const mw = 260, mh = mw * 0.63;
+      ctx.globalAlpha = 0.9;
+      ctx.drawImage(img, (W - mw)/2, y + 40, mw, mh);
       ctx.globalAlpha = 1;
     } catch(e) {}
 
-    // Divider
-    const drawDivider = (y) => {
-      ctx.strokeStyle = "rgba(201,165,92,0.4)";
-      ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.setLineDash([6, 8]); ctx.moveTo(120, y); ctx.lineTo(W - 120, y); ctx.stroke(); ctx.setLineDash([]);
-    };
-    drawDivider(780);
+    // ── TEAR LINE (perforated edge) ──
+    const tearY = 620;
+    ctx.setLineDash([10, 10]);
+    ctx.strokeStyle = "rgba(201,165,92,0.35)";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(PAD + 40, tearY); ctx.lineTo(W - PAD - 40, tearY); ctx.stroke();
+    ctx.setLineDash([]);
 
-    // Details grid
-    const fields = [
-      ["GUEST", (data.name || "Guest").toUpperCase()],
-      ["ADMIT", String(data.guests || 1)],
-      ["DATE", "16 MAY 2026"],
-      ["HOUR", "7:00 PM"],
-      ["VENUE", "ENCLAVE GARDEN"],
-      ["DRESS", "BLACK TIE · MASK"],
-    ];
-    ctx.textAlign = "left";
-    fields.forEach((f, i) => {
-      const col = i % 2, row = Math.floor(i / 2);
-      const x = 140 + col * ((W - 280)/2);
-      const y = 850 + row * 110;
-      ctx.fillStyle = "#8a6a32";
-      ctx.font = "500 18px Manrope, sans-serif";
-      ctx.fillText(f[0], x, y);
+    // Notch circles at tear line
+    ctx.fillStyle = "#0f0a08";
+    ctx.beginPath(); ctx.arc(PAD, tearY, 18, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(W - PAD, tearY, 18, 0, Math.PI * 2); ctx.fill();
+
+    // ── DETAILS SECTION ──
+    y = tearY + 70;
+    const leftCol = 160;
+    const rightCol = W/2 + 40;
+
+    const drawField = (label, value, x, fy) => {
+      ctx.textAlign = "left";
+      ctx.fillStyle = "rgba(201,165,92,0.7)";
+      ctx.font = "600 16px Manrope, sans-serif";
+      ctx.fillText(label, x, fy);
       ctx.fillStyle = "#f4ead4";
-      ctx.font = "500 36px 'Cormorant Garamond', serif";
-      ctx.fillText(f[1], x, y + 44);
-    });
+      ctx.font = "500 38px 'Cormorant Garamond', serif";
+      ctx.fillText(value, x, fy + 48);
+    };
 
-    drawDivider(1180);
+    drawField("GUEST", (data.name || "Guest").toUpperCase(), leftCol, y);
+    drawField("ADMIT", String(data.guests || 1), rightCol, y);
+    y += 120;
+    drawField("DATE", "16 MAY 2026", leftCol, y);
+    drawField("TIME", "7:00 PM SHARP", rightCol, y);
+    y += 120;
+    drawField("VENUE", "ENCLAVE GARDEN", leftCol, y);
+    drawField("DRESS", "BLACK TIE · MASK", rightCol, y);
 
-    // Code
+    // ── DIVIDER ──
+    y += 100;
+    ctx.setLineDash([6, 8]);
+    ctx.strokeStyle = "rgba(201,165,92,0.3)";
+    ctx.beginPath(); ctx.moveTo(leftCol, y); ctx.lineTo(W - leftCol, y); ctx.stroke();
+    ctx.setLineDash([]);
+
+    // ── TICKET CODE ──
+    y += 60;
     ctx.textAlign = "center";
+    ctx.fillStyle = "rgba(201,165,92,0.5)";
+    ctx.font = "600 14px Manrope, sans-serif";
+    ctx.fillText("TICKET CODE", W/2, y);
+    y += 44;
     ctx.fillStyle = "#c9a55c";
-    ctx.font = "500 22px ui-monospace, Menlo, monospace";
-    ctx.fillText(code, W/2, 1240);
+    ctx.font = "500 32px ui-monospace, Menlo, monospace";
+    ctx.fillText(code, W/2, y);
 
-    // QR
-    const qrSize = 280;
+    // ── QR CODE ──
+    y += 60;
+    const qrSize = 240;
     const qrX = (W - qrSize) / 2;
-    const qrY = 1280;
+    const qrY = y;
+
+    // QR background with rounded corners
     ctx.fillStyle = "#faf3e3";
-    ctx.fillRect(qrX - 16, qrY - 16, qrSize + 32, qrSize + 32);
-    // Re-create the same pseudo-QR pattern
-    let h = 0;
-    const v = `PKAY30-${code}-${data.name || ""}`;
-    for (let i = 0; i < v.length; i++) h = (h * 131 + v.charCodeAt(i)) >>> 0;
-    let s = h || 1;
-    const rand = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 0xffffffff; };
-    const N = 21, cell = qrSize / N;
-    ctx.fillStyle = "#0a0807";
+    drawRoundRect(qrX - 20, qrY - 20, qrSize + 40, qrSize + 40, 12);
+    ctx.fill();
+
+    // Pseudo-QR pattern
+    let hash = 0;
+    const val = `PKAY30-${code}-${data.name || ""}`;
+    for (let i = 0; i < val.length; i++) hash = (hash * 131 + val.charCodeAt(i)) >>> 0;
+    let seed = hash || 1;
+    const rand = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 0xffffffff; };
+    const N = 25, cellSz = qrSize / N;
+    ctx.fillStyle = "#1a0e0a";
     for (let yy = 0; yy < N; yy++) {
       for (let xx = 0; xx < N; xx++) {
-        const inFinder =
-          (xx < 7 && yy < 7) ||
-          (xx >= N - 7 && yy < 7) ||
-          (xx < 7 && yy >= N - 7);
+        const inFinder = (xx < 7 && yy < 7) || (xx >= N - 7 && yy < 7) || (xx < 7 && yy >= N - 7);
         let on = false;
         if (inFinder) {
           const fx = xx < 7 ? xx : xx - (N - 7);
           const fy = yy < 7 ? yy : yy - (N - 7);
-          const onEdge = fx === 0 || fx === 6 || fy === 0 || fy === 6;
-          const inner = fx >= 2 && fx <= 4 && fy >= 2 && fy <= 4;
-          on = onEdge || inner;
-        } else {
-          on = rand() > 0.5;
+          on = (fx === 0 || fx === 6 || fy === 0 || fy === 6) || (fx >= 2 && fx <= 4 && fy >= 2 && fy <= 4);
+        } else { on = rand() > 0.48; }
+        if (on) {
+          ctx.fillRect(qrX + xx * cellSz, qrY + yy * cellSz, cellSz - 0.5, cellSz - 0.5);
         }
-        if (on) ctx.fillRect(qrX + xx * cell, qrY + yy * cell, cell, cell);
       }
     }
 
-    // Footer
-    ctx.fillStyle = "#8a6a32";
-    ctx.font = "500 18px Manrope, sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText("CURATED BY ESTILO DE VIDA", W/2, H - 140);
-    ctx.fillStyle = "#c9a55c";
-    ctx.font = "italic 400 30px 'Cormorant Garamond', serif";
-    ctx.fillText("Until then — keep the secret.", W/2, H - 90);
+    // Scan label
+    y = qrY + qrSize + 50;
+    ctx.fillStyle = "rgba(201,165,92,0.5)";
+    ctx.font = "600 14px Manrope, sans-serif";
+    ctx.fillText("SCAN AT ENTRY", W/2, y);
+
+    // ── FOOTER ──
+    y = H - 180;
+    ctx.fillStyle = "rgba(201,165,92,0.4)";
+    ctx.font = "600 14px Manrope, sans-serif";
+    ctx.fillText("C U R A T E D   B Y   E S T I L O   D E   V I D A", W/2, y);
+
+    y += 50;
+    ctx.fillStyle = "rgba(244,234,212,0.6)";
+    ctx.font = "italic 400 28px 'Cormorant Garamond', serif";
+    ctx.fillText("Until then — keep the secret.", W/2, y);
 
     return canvas;
   };
@@ -845,49 +897,83 @@ function TicketScreen({ data, contribute, onShowAfter, showAfter }) {
         {/* Ticket card */}
         <div ref={ticketRef} style={{
           marginTop: 28,
-          background: "linear-gradient(180deg, var(--ink-2) 0%, var(--ink) 100%)",
-          border: "1px solid var(--hair-2)",
-          borderRadius: 14,
-          padding: "28px 24px",
+          background: "linear-gradient(180deg, rgba(26,14,10,0.95) 0%, rgba(10,8,7,0.98) 100%)",
+          border: "1px solid rgba(201,165,92,0.3)",
+          borderRadius: 18,
+          padding: 0,
           position: "relative",
-          boxShadow: "var(--shadow-deep), var(--shadow-glow)",
-          textAlign: "left",
+          boxShadow: "0 30px 80px -20px rgba(0,0,0,0.9), 0 0 60px -10px rgba(201,165,92,0.2)",
+          textAlign: "center",
+          overflow: "hidden",
         }}>
-          {/* Notch holes */}
-          <div style={{ position: "absolute", left: -10, top: "62%", width: 20, height: 20, borderRadius: "50%", background: "var(--ink)" }} />
-          <div style={{ position: "absolute", right: -10, top: "62%", width: 20, height: 20, borderRadius: "50%", background: "var(--ink)" }} />
+          {/* Inner glow */}
+          <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 200, pointerEvents: "none", background: "radial-gradient(ellipse at 50% 0%, rgba(201,165,92,0.15), transparent 70%)" }} />
 
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-            <div>
-              <div className="eyebrow">Pkay · 30th</div>
-              <div className="italiana" style={{ fontSize: 30, color: "var(--ivory)", marginTop: 2 }}>Midnight</div>
-              <div className="italiana" style={{ fontSize: 30, color: "var(--gold)", marginTop: -8, fontStyle: "italic" }}>Masquerade</div>
+          {/* Top section */}
+          <div style={{ padding: "28px 24px 20px", position: "relative" }}>
+            <div className="eyebrow" style={{ fontSize: 10, letterSpacing: "0.4em" }}>P K A Y · 3 0 T H</div>
+            <div style={{ marginTop: 10 }}>
+              <span className="serif gold-text" style={{ fontSize: "clamp(36px, 10vw, 48px)", lineHeight: 1 }}>Midnight</span>
             </div>
-            <div style={{ width: 64, height: 40 }}>
-              <img src="assets/mask.svg" style={{ width: "100%", height: "100%" }} alt="" />
+            <div className="italiana" style={{ fontSize: "clamp(28px, 8vw, 38px)", color: "var(--ivory)", fontStyle: "italic", marginTop: -2 }}>
+              Masquerade
+            </div>
+            <div style={{ width: 80, height: 50, margin: "14px auto 0" }}>
+              <img src="assets/mask.svg" style={{ width: "100%", height: "100%", filter: "drop-shadow(0 0 12px rgba(201,165,92,0.4))" }} alt="" />
             </div>
           </div>
 
-          <div style={{ borderTop: "1px dashed var(--hair-2)", margin: "16px 0" }} />
-
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-            <Field l="Guest of honour" v="Pkay" />
-            <Field l="Admit" v={`${data.guests || 1}`} />
-            <Field l="Date" v="16 May 2026" />
-            <Field l="Hour" v={EVENT.time} />
-            <Field l="Venue" v={EVENT.venue} />
-            <Field l="Dress" v="Black tie · Mask" />
+          {/* Tear line with notches */}
+          <div style={{ position: "relative", margin: "0 -1px" }}>
+            <div style={{ position: "absolute", left: -10, top: "50%", transform: "translateY(-50%)", width: 20, height: 20, borderRadius: "50%", background: "var(--ink)", boxShadow: "inset 2px 0 4px rgba(0,0,0,0.4)" }} />
+            <div style={{ position: "absolute", right: -10, top: "50%", transform: "translateY(-50%)", width: 20, height: 20, borderRadius: "50%", background: "var(--ink)", boxShadow: "inset -2px 0 4px rgba(0,0,0,0.4)" }} />
+            <div style={{ borderTop: "2px dashed rgba(201,165,92,0.25)", margin: "0 24px" }} />
           </div>
 
-          <div style={{ borderTop: "1px dashed var(--hair-2)", margin: "16px 0" }} />
-
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14 }}>
-            <div>
-              <div className="eyebrow">Your name</div>
-              <div className="serif" style={{ fontSize: 24, color: "var(--ivory)", marginTop: 2 }}>{data.name || "Guest"}</div>
-              <div style={{ fontSize: 11, color: "var(--gold-deep)", letterSpacing: "0.3em", marginTop: 8, fontFamily: "ui-monospace, Menlo, monospace" }}>{code}</div>
+          {/* Details section */}
+          <div style={{ padding: "20px 24px", textAlign: "left" }}>
+            {/* Guest name - prominent */}
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 9, letterSpacing: "0.4em", color: "var(--gold)", textTransform: "uppercase", fontWeight: 600, marginBottom: 4 }}>GUEST</div>
+              <div className="serif" style={{ fontSize: 28, color: "var(--ivory)", lineHeight: 1 }}>{data.name || "Guest"}</div>
             </div>
-            <QrSquare value={`PKAY30-${code}-${data.name || ""}`} size={92} />
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px 14px" }}>
+              <div>
+                <div style={{ fontSize: 9, letterSpacing: "0.32em", color: "rgba(201,165,92,0.6)", textTransform: "uppercase", fontWeight: 600 }}>ADMIT</div>
+                <div className="serif" style={{ fontSize: 20, color: "var(--ivory)", marginTop: 3 }}>{data.guests || 1}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 9, letterSpacing: "0.32em", color: "rgba(201,165,92,0.6)", textTransform: "uppercase", fontWeight: 600 }}>DATE</div>
+                <div className="serif" style={{ fontSize: 20, color: "var(--ivory)", marginTop: 3 }}>16 May 2026</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 9, letterSpacing: "0.32em", color: "rgba(201,165,92,0.6)", textTransform: "uppercase", fontWeight: 600 }}>TIME</div>
+                <div className="serif" style={{ fontSize: 20, color: "var(--ivory)", marginTop: 3 }}>7:00 PM Sharp</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 9, letterSpacing: "0.32em", color: "rgba(201,165,92,0.6)", textTransform: "uppercase", fontWeight: 600 }}>VENUE</div>
+                <div className="serif" style={{ fontSize: 20, color: "var(--ivory)", marginTop: 3 }}>{EVENT.venue}</div>
+              </div>
+              <div style={{ gridColumn: "1 / -1" }}>
+                <div style={{ fontSize: 9, letterSpacing: "0.32em", color: "rgba(201,165,92,0.6)", textTransform: "uppercase", fontWeight: 600 }}>DRESS CODE</div>
+                <div className="serif" style={{ fontSize: 20, color: "var(--ivory)", marginTop: 3 }}>Black Tie · Masquerade Mask</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Bottom section - QR & code */}
+          <div style={{ padding: "16px 24px 24px", background: "rgba(0,0,0,0.3)", borderTop: "1px solid rgba(201,165,92,0.1)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+              <QrSquare value={`PKAY30-${code}-${data.name || ""}`} size={88} />
+              <div style={{ flex: 1, textAlign: "left" }}>
+                <div style={{ fontSize: 9, letterSpacing: "0.32em", color: "rgba(201,165,92,0.5)", textTransform: "uppercase", fontWeight: 600 }}>TICKET CODE</div>
+                <div style={{ fontSize: 16, color: "var(--gold)", letterSpacing: "0.2em", marginTop: 6, fontFamily: "ui-monospace, Menlo, monospace", fontWeight: 500 }}>{code}</div>
+                <div style={{ fontSize: 10, letterSpacing: "0.24em", color: "var(--smoke)", textTransform: "uppercase", marginTop: 8 }}>
+                  Scan at entry
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -1014,6 +1100,9 @@ function Field({ l, v }) {
 // 9. Regrets screen
 // ─────────────────────────────────────────────────────────
 function RegretsScreen({ data, onBack }) {
+  useEffect(() => {
+    if (data._sessionId && window.markPartialComplete) window.markPartialComplete(data._sessionId);
+  }, []);
   return (
     <div className="stage fade-in velvet" style={{ padding: "60px 28px", position: "relative", alignItems: "center", justifyContent: "center", textAlign: "center" }}>
       <FloralCorner position="tl" opacity={0.4} />
@@ -1066,7 +1155,7 @@ function AfterPartyScreen({ onBack }) {
           </div>
           <div style={{ borderTop: "1px dashed var(--hair-2)", margin: "16px 0" }} />
           <div className="serif-italic" style={{ color: "var(--smoke)", fontSize: 16, lineHeight: 1.5 }}>
-            "Masks shall be provided. To remove yours before midnight is to break the spell."
+            "Masks will be provided on arrival for those without one. To remove yours before midnight is to break the spell."
           </div>
         </div>
 
