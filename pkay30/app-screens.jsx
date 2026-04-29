@@ -600,16 +600,16 @@ function TicketScreen({ data, contribute, onShowAfter, showAfter }) {
 
   const [savingPng, setSavingPng] = useState(false);
 
+  const calendarGcal = () => {
+    const gcalUrl = "https://calendar.google.com/calendar/render?action=TEMPLATE" +
+      "&text=" + encodeURIComponent("Pkay's 30th — Midnight Masquerade") +
+      "&dates=20260516T190000/20260517T020000" +
+      "&location=" + encodeURIComponent(EVENT.venue + ", " + EVENT.city) +
+      "&details=" + encodeURIComponent("Black tie + Masquerade Mask required. Doors close at 7:30 PM.");
+    window.open(gcalUrl, "_blank");
+  };
+
   const calendar = () => {
-    if (isInAppBrowser()) {
-      const gcalUrl = "https://calendar.google.com/calendar/render?action=TEMPLATE" +
-        "&text=" + encodeURIComponent("Pkay's 30th — Midnight Masquerade") +
-        "&dates=20260516T190000/20260517T020000" +
-        "&location=" + encodeURIComponent(EVENT.venue + ", " + EVENT.city) +
-        "&details=" + encodeURIComponent("Black tie + Masquerade Mask required. Doors close at 7:30 PM.");
-      window.open(gcalUrl, "_blank");
-      return;
-    }
     const lines = [
       "BEGIN:VCALENDAR",
       "VERSION:2.0",
@@ -820,44 +820,38 @@ function TicketScreen({ data, contribute, onShowAfter, showAfter }) {
     return canvas;
   };
 
-  const [showTicketImage, setShowTicketImage] = useState(null);
+  const [ticketDataUrl, setTicketDataUrl] = useState(null);
 
-  const isInAppBrowser = () => {
-    const ua = navigator.userAgent || "";
-    return /FBAN|FBAV|Instagram|Twitter|WhatsApp|Line|Snapchat|TikTok|wv\)/i.test(ua);
-  };
+  useEffect(() => {
+    renderTicketCanvas().then((canvas) => {
+      setTicketDataUrl(canvas.toDataURL("image/png"));
+    }).catch((e) => console.error("[pkay30] Ticket render:", e));
+  }, []);
 
   const downloadPng = () => {
-    setSavingPng(true);
-    return renderTicketCanvas().then((canvas) => {
-      return new Promise((resolve) => {
-        canvas.toBlob((blob) => {
-          if (isInAppBrowser()) {
-            const reader = new FileReader();
-            reader.onload = () => {
-              setShowTicketImage(reader.result);
-              setSavingPng(false);
-              resolve();
-            };
-            reader.readAsDataURL(blob);
-          } else {
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = `pkay-30-ticket-${code}.png`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            setTimeout(() => URL.revokeObjectURL(url), 1000);
-            setSavingPng(false);
-            resolve();
-          }
-        }, "image/png");
-      });
-    }).catch((e) => {
-      console.error("[pkay30] Ticket render error:", e);
-      setSavingPng(false);
-    });
+    if (!ticketDataUrl) {
+      setSavingPng(true);
+      renderTicketCanvas().then((canvas) => {
+        const url = canvas.toDataURL("image/png");
+        setTicketDataUrl(url);
+        triggerDownload(url);
+        setSavingPng(false);
+      }).catch(() => setSavingPng(false));
+      return Promise.resolve();
+    }
+    triggerDownload(ticketDataUrl);
+    return Promise.resolve();
+  };
+
+  const triggerDownload = (dataUrl) => {
+    try {
+      const a = document.createElement("a");
+      a.href = dataUrl;
+      a.download = `pkay-30-ticket-${code}.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } catch (e) {}
   };
 
   // Apple Wallet — a real .pkpass requires Apple-issued signing on a server.
@@ -866,7 +860,6 @@ function TicketScreen({ data, contribute, onShowAfter, showAfter }) {
   // Photos and add to Apple Wallet via Shortcuts. We also prep an .ics so the
   // event lives in their Calendar regardless.
   const addToAppleWallet = async () => {
-    // If you later host a pkpass generator at /api/pkpass, set window.__PKPASS_ENDPOINT
     const endpoint = window.__PKPASS_ENDPOINT;
     if (endpoint) {
       try {
@@ -884,7 +877,7 @@ function TicketScreen({ data, contribute, onShowAfter, showAfter }) {
       } catch (e) { /* fall through */ }
     }
     await downloadPng();
-    calendar();
+    calendarGcal();
   };
 
   // Google Wallet — same story: real save-to-wallet links require a signed JWT
@@ -897,7 +890,7 @@ function TicketScreen({ data, contribute, onShowAfter, showAfter }) {
       return;
     }
     await downloadPng();
-    calendar();
+    calendarGcal();
   };
 
   return (
@@ -1004,21 +997,20 @@ function TicketScreen({ data, contribute, onShowAfter, showAfter }) {
           </div>
         </div>
 
-        {/* In-app browser: show ticket image for long-press save */}
-        {showTicketImage && (
-          <div style={{ marginTop: 20, padding: 16, borderRadius: 12, border: "1px solid var(--hair)", background: "var(--ink-2)", textAlign: "center" }}>
-            <div style={{ fontSize: 12, color: "var(--gold)", letterSpacing: "0.2em", textTransform: "uppercase", fontWeight: 600, marginBottom: 10 }}>
-              Press &amp; hold the image to save
+        {/* Downloadable ticket image — always visible for long-press save */}
+        {ticketDataUrl && (
+          <div style={{ marginTop: 20, padding: 16, borderRadius: 12, border: "1px solid rgba(201,165,92,0.2)", background: "rgba(0,0,0,0.3)", textAlign: "center" }}>
+            <div style={{ fontSize: 10, color: "var(--gold-deep)", letterSpacing: "0.24em", textTransform: "uppercase", fontWeight: 600, marginBottom: 10 }}>
+              Press &amp; hold to save image
             </div>
-            <img src={showTicketImage} alt="Your ticket" style={{ width: "100%", maxWidth: 320, borderRadius: 8 }} />
-            <button className="btn-ghost" style={{ marginTop: 12 }} onClick={() => setShowTicketImage(null)}>Dismiss</button>
+            <img src={ticketDataUrl} alt="Your ticket" style={{ width: "100%", maxWidth: 300, borderRadius: 8, border: "1px solid rgba(201,165,92,0.15)" }} />
           </div>
         )}
 
         {/* Actions */}
         <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 24 }}>
           <button className="btn-gold" onClick={downloadPng} disabled={savingPng}>
-            {savingPng ? "Preparing…" : "Download Ticket"}
+            {savingPng ? "Preparing…" : "Save Ticket to Device"}
           </button>
 
           {/* Wallet row */}
@@ -1063,7 +1055,10 @@ function TicketScreen({ data, contribute, onShowAfter, showAfter }) {
             </button>
           </div>
 
-          <button className="btn-ghost" onClick={calendar}>Add to calendar (.ics)</button>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <button className="btn-ghost" onClick={calendar}>Download .ics</button>
+            <button className="btn-ghost" onClick={calendarGcal}>Google Calendar</button>
+          </div>
           <a className="btn-ghost" href={EVENT.mapUrl} target="_blank" rel="noreferrer" style={{ textAlign: "center", textDecoration: "none" }}>
             Open map · {EVENT.venue}
           </a>
