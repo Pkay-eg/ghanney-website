@@ -136,7 +136,7 @@ function IntroScreen({ onOpen, headline }) {
           animation: "fadeUp 800ms 700ms cubic-bezier(0.22,1,0.36,1) both",
           letterSpacing: "0.12em",
         }}>
-          {headline || "invites you to a midnight masquerade"}
+          {headline || "invites you to a black tie masquerade"}
         </div>
 
         <div style={{ margin: "30px auto 26px", maxWidth: 240, animation: "fadeUp 800ms 900ms both" }}>
@@ -1193,7 +1193,7 @@ function AfterPartyScreen({ onBack }) {
           </div>
           <div style={{ borderTop: "1px dashed var(--hair-2)", margin: "16px 0" }} />
           <div className="serif-italic" style={{ color: "var(--smoke)", fontSize: 16, lineHeight: 1.5 }}>
-            "Masks will be provided on arrival for those without one. To remove yours before midnight is to break the spell."
+            "Masks will be provided on arrival for those without one. To remove yours before the night ends is to break the spell."
           </div>
         </div>
 
