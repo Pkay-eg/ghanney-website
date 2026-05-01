@@ -1,4 +1,4 @@
-// Pkay 30 — Midnight Masquerade
+// Pkay 30 — Black Tie Masquerade
 // Step components
 
 const { useState, useEffect, useRef, useMemo } = React;
@@ -18,7 +18,7 @@ const EVENT = {
 };
 
 const PALETTE_LABEL = {
-  midnight: "Midnight",
+  midnight: "Black Tie",
   oxblood: "Oxblood",
   onyx: "Onyx",
   champagne: "Champagne",
@@ -201,7 +201,7 @@ function CoverScreen({ onBegin, headline }) {
           fontSize: "clamp(64px, 22vw, 130px)", lineHeight: 0.9,
           letterSpacing: "-0.03em",
         }}>
-          <span className="gold-text">{headline?.split("|")[0] || "Midnight"}</span>
+          <span className="gold-text">{headline?.split("|")[0] || "Black Tie"}</span>
         </h1>
         <h1 className="italiana" style={{
           margin: 0,
@@ -602,7 +602,7 @@ function TicketScreen({ data, contribute, onShowAfter, showAfter, onEdit }) {
 
   const calendarGcal = () => {
     const gcalUrl = "https://calendar.google.com/calendar/render?action=TEMPLATE" +
-      "&text=" + encodeURIComponent("Pkay's 30th — Midnight Masquerade") +
+      "&text=" + encodeURIComponent("Pkay's 30th — Black Tie Masquerade") +
       "&dates=20260516T190000/20260517T020000" +
       "&location=" + encodeURIComponent(EVENT.venue + ", " + EVENT.city) +
       "&details=" + encodeURIComponent("Black tie + Masquerade Mask required. Doors close at 7:30 PM.");
@@ -615,7 +615,7 @@ function TicketScreen({ data, contribute, onShowAfter, showAfter, onEdit }) {
       "VERSION:2.0",
       "PRODID:-//PKay30//EN",
       "BEGIN:VEVENT",
-      "SUMMARY:Pkay's 30th — Midnight Masquerade",
+      "SUMMARY:Pkay's 30th — Black Tie Masquerade",
       "DTSTART:20260516T190000",
       "DTEND:20260517T020000",
       "LOCATION:" + EVENT.venue + "\\, " + EVENT.city,
@@ -700,7 +700,7 @@ function TicketScreen({ data, contribute, onShowAfter, showAfter, onEdit }) {
     goldGrad.addColorStop(0.5, "#c9a55c");
     goldGrad.addColorStop(1, "#8a6530");
     ctx.fillStyle = goldGrad;
-    ctx.fillText("Midnight", W/2, y);
+    ctx.fillText("Black Tie", W/2, y);
 
     y += 110;
     ctx.font = "italic 400 120px 'Italiana', serif";
@@ -928,7 +928,7 @@ function TicketScreen({ data, contribute, onShowAfter, showAfter, onEdit }) {
           <div style={{ padding: "28px 24px 20px", position: "relative" }}>
             <div className="eyebrow" style={{ fontSize: 10, letterSpacing: "0.4em" }}>P K A Y · 3 0 T H</div>
             <div style={{ marginTop: 10 }}>
-              <span className="serif gold-text" style={{ fontSize: "clamp(36px, 10vw, 48px)", lineHeight: 1 }}>Midnight</span>
+              <span className="serif gold-text" style={{ fontSize: "clamp(36px, 10vw, 48px)", lineHeight: 1 }}>Black Tie</span>
             </div>
             <div className="italiana" style={{ fontSize: "clamp(28px, 8vw, 38px)", color: "var(--ivory)", fontStyle: "italic", marginTop: -2 }}>
               Masquerade

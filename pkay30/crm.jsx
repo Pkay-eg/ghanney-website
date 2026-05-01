@@ -848,7 +848,7 @@ async function generateTicketPng(guest) {
   goldGrad.addColorStop(0.5, "#c9a55c");
   goldGrad.addColorStop(1, "#8a6530");
   ctx.fillStyle = goldGrad;
-  ctx.fillText("Midnight", W/2, y);
+  ctx.fillText("Black Tie", W/2, y);
 
   y += 110;
   ctx.font = "italic 400 120px 'Italiana', serif";
