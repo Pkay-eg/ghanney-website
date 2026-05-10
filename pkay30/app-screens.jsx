@@ -1234,9 +1234,94 @@ function MusicToggle({ on, setOn }) {
   );
 }
 
+// ─────────────────────────────────────────────────────────
+// 11. Sold Out screen
+// ─────────────────────────────────────────────────────────
+function SoldOutScreen() {
+  const calendarGcal = () => {
+    const gcalUrl = "https://calendar.google.com/calendar/render?action=TEMPLATE" +
+      "&text=" + encodeURIComponent("Pkay's 30th — After Party") +
+      "&dates=20260516T220000/20260517T040000" +
+      "&location=" + encodeURIComponent(EVENT.venue + ", " + EVENT.city) +
+      "&details=" + encodeURIComponent("After-party starts at 10 PM. Masks required.");
+    window.open(gcalUrl, "_blank");
+  };
+
+  return (
+    <div className="stage fade-in" style={{ padding: "60px 24px", position: "relative", overflow: "hidden", alignItems: "center", justifyContent: "center", textAlign: "center" }}>
+      <FloralCorner position="tl" opacity={0.5} />
+      <FloralCorner position="tr" opacity={0.5} />
+      <FloralCorner position="bl" opacity={0.5} />
+      <FloralCorner position="br" opacity={0.5} />
+
+      <div style={{ position: "relative", zIndex: 2, maxWidth: 420, margin: "0 auto" }}>
+        <div style={{ width: 120, height: 76, margin: "0 auto 24px" }}>
+          <img src="assets/mask.svg" style={{ width: "100%", height: "100%", filter: "drop-shadow(0 0 30px rgba(201,165,92,0.5))" }} alt="" />
+        </div>
+
+        <div className="eyebrow">Pkay's 30th · Estilo de Vida</div>
+        <h1 className="serif" style={{ fontSize: "clamp(48px, 14vw, 72px)", lineHeight: 1, margin: "12px 0 0", letterSpacing: "-0.02em" }}>
+          <span className="gold-text">Sold Out</span>
+        </h1>
+        <div className="italiana" style={{ fontSize: "clamp(28px, 8vw, 38px)", color: "var(--ivory)", fontStyle: "italic", marginTop: 4 }}>
+          Black Tie Masquerade
+        </div>
+
+        <div className="serif-italic" style={{ color: "var(--smoke)", fontSize: 20, lineHeight: 1.6, marginTop: 28, maxWidth: 340, margin: "28px auto 0" }}>
+          The dinner is at capacity — every seat has been claimed.
+        </div>
+
+        <div style={{
+          marginTop: 36,
+          padding: "28px 24px",
+          borderRadius: 14,
+          border: "1px solid rgba(201,165,92,0.3)",
+          background: "linear-gradient(180deg, rgba(201,165,92,0.08) 0%, rgba(74,13,24,0.2) 100%)",
+          boxShadow: "0 0 40px -10px rgba(201,165,92,0.15) inset",
+        }}>
+          <div style={{ fontSize: 10, letterSpacing: "0.4em", color: "var(--gold)", textTransform: "uppercase", fontWeight: 600, marginBottom: 12 }}>
+            You're invited to
+          </div>
+          <h2 className="italiana" style={{ fontSize: "clamp(32px, 10vw, 48px)", lineHeight: 1, color: "var(--ivory)", fontStyle: "italic", margin: "0 0 6px" }}>
+            The After-Party
+          </h2>
+          <div className="serif-italic" style={{ color: "var(--smoke)", fontSize: 16, lineHeight: 1.5, marginBottom: 20 }}>
+            The night continues — slip on your mask and join us.
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, textAlign: "left" }}>
+            <Field l="Date" v="16 May 2026" />
+            <Field l="Time" v="10:00 PM" />
+            <Field l="Venue" v={EVENT.venue} />
+            <Field l="Dress" v="Mask required" />
+          </div>
+
+          <div style={{ borderTop: "1px dashed rgba(201,165,92,0.2)", margin: "18px 0" }} />
+          <div className="serif-italic" style={{ color: "var(--smoke)", fontSize: 14, lineHeight: 1.5 }}>
+            Masks will be provided on arrival for those without one.
+          </div>
+        </div>
+
+        <div style={{ marginTop: 28, display: "flex", flexDirection: "column", gap: 10 }}>
+          <button className="btn-gold" onClick={calendarGcal}>
+            Add After-Party to Calendar
+          </button>
+          <a className="btn-ghost" href={EVENT.mapUrl} target="_blank" rel="noreferrer" style={{ textAlign: "center", textDecoration: "none" }}>
+            Get directions · {EVENT.venue}
+          </a>
+        </div>
+
+        <div style={{ marginTop: 40, fontSize: 10, letterSpacing: "0.3em", color: "var(--gold-deep)", textTransform: "uppercase" }}>
+          Curated by {EVENT.curatedBy}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Expose to window for the main app file
 Object.assign(window, {
   IntroScreen, CoverScreen, AttendStep, IdentityStep, GuestsStep, MessageStep,
-  ContributeStep, TicketScreen, RegretsScreen, AfterPartyScreen,
+  ContributeStep, TicketScreen, RegretsScreen, AfterPartyScreen, SoldOutScreen,
   MusicToggle, FloralCorner, Petals, EVENT, PALETTE_LABEL,
 });

@@ -103,7 +103,7 @@ function SkipToTicket({ data, contribute, onDone }) {
 function App() {
   const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
   const [phase, setPhase] = useState(
-    typeof window !== "undefined" && /[?&]admin=1/.test(window.location.search) ? "admin" : "intro"
+    typeof window !== "undefined" && /[?&]admin=1/.test(window.location.search) ? "admin" : "soldout"
   );
   const [step, setStep] = useState(0);
   const [data, setData] = useState(() => ({
@@ -176,6 +176,10 @@ function App() {
             window.history.replaceState({}, "", url);
             setPhase("intro");
           }} />
+        )}
+
+        {phase === "soldout" && (
+          <SoldOutScreen />
         )}
 
         {phase === "intro" && (
