@@ -1309,6 +1309,9 @@ function SoldOutScreen() {
           <a className="btn-ghost" href={EVENT.mapUrl} target="_blank" rel="noreferrer" style={{ textAlign: "center", textDecoration: "none" }}>
             Get directions · {EVENT.venue}
           </a>
+          <a className="btn-ghost" href="tel:+233548195021" style={{ textAlign: "center", textDecoration: "none" }}>
+            Call Debbie (PA) · +233 54 819 5021
+          </a>
         </div>
 
         <div style={{ marginTop: 40, fontSize: 10, letterSpacing: "0.3em", color: "var(--gold-deep)", textTransform: "uppercase" }}>
