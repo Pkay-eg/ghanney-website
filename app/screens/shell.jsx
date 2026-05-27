@@ -70,6 +70,13 @@ const Sidebar = ({ active, onNav, mode }) => {
         <span>Team</span>
         <span className="meta">{(window.team || []).length}</span>
       </button>
+      <button className={`nav-item ${active === "integrations" ? "active" : ""}`} onClick={() => onNav("integrations")}>
+        <span className="ic"><Icon name="link" size={16} /></span>
+        <span>Integrations</span>
+        {(window.integrations || []).length > 0 && (
+          <span className="meta">{(window.integrations || []).length}</span>
+        )}
+      </button>
       <button className="nav-item">
         <span className="ic"><Icon name="calendar" size={16} /></span>
         <span>Calendar</span>

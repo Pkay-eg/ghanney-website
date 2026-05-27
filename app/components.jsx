@@ -44,6 +44,10 @@ const Icon = ({ name, size = 16, stroke = 1.6 }) => {
     bolt: <><path d="M13 3L4 14h7l-1 7 9-11h-7z" /></>,
     globe: <><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3a14 14 0 010 18M12 3a14 14 0 000 18" /></>,
     command: <><rect x="6" y="6" width="12" height="12" rx="0" /><path d="M9 6V4a2 2 0 10-2 2h2zm6 0V4a2 2 0 112 2h-2zM9 18v2a2 2 0 11-2-2h2zm6 0v2a2 2 0 102-2h-2z" /></>,
+    link: <><path d="M10 13a5 5 0 007.07 0l2.83-2.83a5 5 0 00-7.07-7.07l-1.41 1.41" /><path d="M14 11a5 5 0 00-7.07 0L4.1 13.83a5 5 0 007.07 7.07l1.41-1.41" /></>,
+    plug: <><path d="M9 7V3M15 7V3" /><path d="M5 7h14v4a7 7 0 01-14 0z" /><path d="M12 18v3" /></>,
+    shieldCheck: <><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z" /><path d="M9 12l2 2 4-4" /></>,
+    alert: <><path d="M12 9v4M12 17v.01" /><path d="M10.3 3.7L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.7a2 2 0 00-3.4 0z" /></>,
   };
   return (
     <svg

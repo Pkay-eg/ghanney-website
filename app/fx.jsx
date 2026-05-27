@@ -181,22 +181,24 @@ const CurrencySwitch = ({ size = "md" }) => {
 const FxRatesWidget = ({ compact = false }) => {
   const display = React.useContext(window.CurrencyContext);
 
-  // Show rates of the other currencies in terms of the display currency.
+  // Quote as "1 <display> = N <other>" (e.g. 1 USD = 14.50 GHS). This is
+  // the natural way locals think about rates ("how many cedis does $1 buy?")
+  // and matches the inverted ticker tape (USD/GHS).
   const others = ["USD", "GHS", "AED"].filter((c) => c !== display);
 
-  const rates = others.map((from) => {
-    const cur = convertFx(1, from, display);
-    const prev = (1 / FX_RATES_PREV[from]) * FX_RATES_PREV[display];
-    const chg = ((cur - prev) / prev) * 100;
-    return { pair: `${from}/${display}`, from, cur, chg };
+  const rates = others.map((to) => {
+    const cur = convertFx(1, display, to);
+    const prev = (1 / FX_RATES_PREV[display]) * FX_RATES_PREV[to];
+    const chg = prev > 0 ? ((cur - prev) / prev) * 100 : 0;
+    return { pair: `${display}/${to}`, to, cur, chg };
   });
 
-  // Cross pair too
+  // Cross pair between the two "other" currencies
   const crossA = others[0], crossB = others[1];
   const crossCur = convertFx(1, crossA, crossB);
   const crossPrev = (1 / FX_RATES_PREV[crossA]) * FX_RATES_PREV[crossB];
-  const crossChg = ((crossCur - crossPrev) / crossPrev) * 100;
-  rates.push({ pair: `${crossA}/${crossB}`, cur: crossCur, chg: crossChg });
+  const crossChg = crossPrev > 0 ? ((crossCur - crossPrev) / crossPrev) * 100 : 0;
+  rates.push({ pair: `${crossA}/${crossB}`, to: crossB, cur: crossCur, chg: crossChg });
 
   return (
     <div className={compact ? "" : "card"}>
@@ -212,24 +214,26 @@ const FxRatesWidget = ({ compact = false }) => {
         </div>
       )}
       <div className="col gap-3">
-        {rates.map((r) => (
-          <div key={r.pair} className="row between">
-            <div className="row gap-3">
-              <span className="mono" style={{ fontSize: 12, fontWeight: 600, letterSpacing: "0.04em" }}>{r.pair}</span>
-              <span className="muted" style={{ fontSize: 11 }}>
-                1 {r.pair.split("/")[0]} =
-              </span>
+        {rates.map((r) => {
+          const [base, quote] = r.pair.split("/");
+          const decimals = r.cur >= 10 ? 2 : r.cur >= 1 ? 3 : 4;
+          return (
+            <div key={r.pair} className="row between">
+              <div className="row gap-3">
+                <span className="mono" style={{ fontSize: 12, fontWeight: 600, letterSpacing: "0.04em" }}>{r.pair}</span>
+                <span className="muted" style={{ fontSize: 11 }}>1 {base} =</span>
+              </div>
+              <div className="row gap-3">
+                <span className="mono" style={{ fontSize: 13 }}>
+                  {SYMBOLS[quote]}{r.cur.toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}
+                </span>
+                <span className={`mono ${r.chg >= 0 ? "pos" : "neg"}`} style={{ fontSize: 11, width: 56, textAlign: "right" }}>
+                  {r.chg >= 0 ? "+" : ""}{r.chg.toFixed(2)}%
+                </span>
+              </div>
             </div>
-            <div className="row gap-3">
-              <span className="mono" style={{ fontSize: 13 }}>
-                {SYMBOLS[r.pair.split("/")[1]]}{r.cur.toLocaleString(undefined, { minimumFractionDigits: r.cur > 10 ? 2 : 4, maximumFractionDigits: r.cur > 10 ? 2 : 4 })}
-              </span>
-              <span className={`mono ${r.chg >= 0 ? "pos" : "neg"}`} style={{ fontSize: 11, width: 56, textAlign: "right" }}>
-                {r.chg >= 0 ? "+" : ""}{r.chg.toFixed(2)}%
-              </span>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
       {!compact && (
         <>

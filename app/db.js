@@ -97,12 +97,17 @@
   });
 
   const mapPositionFromDb = (r) => ({
+    id: r.id,
     sym: r.symbol,
     name: r.name,
     qty: Number(r.qty),
     avg: Number(r.avg_price),
     last: Number(r.last_price),
     cls: r.cls,
+    source: r.source || "manual",
+    integrationId: r.integration_id || null,
+    externalId: r.external_id || null,
+    lastSyncedAt: r.last_synced_at || null,
   });
 
   const mapPositionToDb = (o) => ({
@@ -112,6 +117,38 @@
     avg_price: o.avg,
     last_price: o.last,
     cls: o.cls,
+    source: o.source || "manual",
+    integration_id: o.integrationId || null,
+    external_id: o.externalId || null,
+    last_synced_at: o.lastSyncedAt || null,
+  });
+
+  const mapIntegrationFromDb = (r) => ({
+    id: r.id,
+    provider: r.provider,
+    label: r.label,
+    apiKey: r.api_key,
+    apiSecret: r.api_secret,
+    passphrase: r.passphrase,
+    endpoint: r.endpoint,
+    status: r.status || "connected",
+    scope: r.scope || "read",
+    lastSyncAt: r.last_sync_at,
+    lastSyncStatus: r.last_sync_status,
+    lastSyncCount: r.last_sync_count || 0,
+    metadata: r.metadata || {},
+    createdAt: r.created_at,
+  });
+  const mapIntegrationToDb = (o) => ({
+    provider: o.provider,
+    label: o.label,
+    api_key: o.apiKey || null,
+    api_secret: o.apiSecret || null,
+    passphrase: o.passphrase || null,
+    endpoint: o.endpoint || null,
+    status: o.status || "connected",
+    scope: o.scope || "read",
+    metadata: o.metadata || {},
   });
 
   const mapProjectFromDb = (r) => ({
@@ -398,6 +435,7 @@
         teamRows,
         activityRows,
         netWorthRows,
+        integrationsRows,
       ] = await Promise.all([
         list("investments", { order: "updated_at", asc: false }),
         list("loans", { order: "due_on", asc: true }),
@@ -412,6 +450,7 @@
         list("profiles", { order: "joined_at", asc: false }),
         list("activity_log", { order: "created_at", asc: false, limit: 50 }),
         list("net_worth_snapshots", { order: "snapshot_date", asc: true }),
+        list("integrations", { order: "created_at", asc: false }).catch(() => []),
       ]);
 
       // CRITICAL: mutate existing arrays in-place rather than reassign,
@@ -424,6 +463,7 @@
       replaceArray(window.incomeStreams, incomeStreamsRows.map(mapIncomeStreamFromDb));
       replaceArray(window.contracts, contractsRows.map(mapContractFromDb));
       replaceArray(window.team, teamRows.map(mapTeamFromDb));
+      replaceArray(window.integrations, (integrationsRows || []).map(mapIntegrationFromDb));
 
       window.__investmentPayments = invPays;
 
@@ -900,6 +940,136 @@
     },
   };
 
+  // ----------------------------------------------------------
+  // Integrations — external account connections
+  // ----------------------------------------------------------
+  const integrations = {
+    async create(o) {
+      if (!isConfigured()) {
+        const local = { ...o, id: crypto.randomUUID(), createdAt: new Date().toISOString() };
+        window.integrations.unshift(local);
+        return local;
+      }
+      const row = await insert("integrations", mapIntegrationToDb(o));
+      const mapped = mapIntegrationFromDb(row);
+      window.integrations.unshift(mapped);
+      logActivity({
+        entity: "integration", entity_id: row.id, action: "created",
+        message: `Connected ${mapped.provider}${mapped.label ? ` · ${mapped.label}` : ""}`,
+        tag: "integration",
+      });
+      return mapped;
+    },
+    async update(id, patch) {
+      if (!isConfigured()) {
+        const idx = window.integrations.findIndex((i) => i.id === id);
+        if (idx >= 0) window.integrations[idx] = { ...window.integrations[idx], ...patch };
+        return window.integrations[idx];
+      }
+      const dbPatch = {};
+      if (patch.label != null) dbPatch.label = patch.label;
+      if (patch.apiKey != null) dbPatch.api_key = patch.apiKey;
+      if (patch.apiSecret != null) dbPatch.api_secret = patch.apiSecret;
+      if (patch.passphrase != null) dbPatch.passphrase = patch.passphrase;
+      if (patch.endpoint != null) dbPatch.endpoint = patch.endpoint;
+      if (patch.status != null) dbPatch.status = patch.status;
+      if (patch.scope != null) dbPatch.scope = patch.scope;
+      if (patch.lastSyncAt !== undefined) dbPatch.last_sync_at = patch.lastSyncAt;
+      if (patch.lastSyncStatus !== undefined) dbPatch.last_sync_status = patch.lastSyncStatus;
+      if (patch.lastSyncCount !== undefined) dbPatch.last_sync_count = patch.lastSyncCount;
+      if (patch.metadata !== undefined) dbPatch.metadata = patch.metadata;
+      dbPatch.updated_at = new Date().toISOString();
+      const row = await update("integrations", id, dbPatch);
+      const idx = window.integrations.findIndex((i) => i.id === id);
+      if (idx >= 0) window.integrations[idx] = mapIntegrationFromDb(row);
+      return window.integrations[idx];
+    },
+    async remove(id) {
+      const integration = window.integrations.find((i) => i.id === id);
+      if (isConfigured()) {
+        // Wipe synced positions from this integration. Manual entries are kept.
+        const user = (await sb().auth.getUser()).data?.user;
+        if (user) {
+          await sb().from("positions").delete().eq("user_id", user.id).eq("integration_id", id);
+        }
+        await remove("integrations", id);
+      }
+      replaceArray(window.integrations, window.integrations.filter((i) => i.id !== id));
+      replaceArray(window.tradingPositions, window.tradingPositions.filter((p) => p.integrationId !== id));
+      if (integration) {
+        logActivity({
+          entity: "integration", entity_id: id, action: "deleted",
+          message: `Disconnected ${integration.provider}${integration.label ? ` · ${integration.label}` : ""}`,
+          tag: "integration",
+        });
+      }
+    },
+    // Replace all positions that came from this integration with the freshly
+    // fetched list. Manually-entered positions are untouched.
+    async syncPositions(integration, positions) {
+      const now = new Date().toISOString();
+      const stamped = positions.map((p) => ({
+        ...p,
+        source: integration.provider,
+        integrationId: integration.id,
+        lastSyncedAt: now,
+      }));
+
+      if (!isConfigured()) {
+        replaceArray(
+          window.tradingPositions,
+          window.tradingPositions
+            .filter((p) => p.integrationId !== integration.id)
+            .concat(stamped)
+        );
+      } else {
+        const user = (await sb().auth.getUser()).data?.user;
+        if (!user) throw new Error("Not signed in.");
+        await sb().from("positions").delete().eq("user_id", user.id).eq("integration_id", integration.id);
+        if (stamped.length > 0) {
+          const rows = stamped.map((p) => ({ ...mapPositionToDb(p), user_id: user.id }));
+          const { data, error } = await sb().from("positions").insert(rows).select();
+          if (error) throw error;
+          const newOnes = data.map(mapPositionFromDb);
+          replaceArray(
+            window.tradingPositions,
+            window.tradingPositions
+              .filter((p) => p.integrationId !== integration.id)
+              .concat(newOnes)
+          );
+        } else {
+          replaceArray(
+            window.tradingPositions,
+            window.tradingPositions.filter((p) => p.integrationId !== integration.id)
+          );
+        }
+      }
+
+      // Update the integration's last-sync metadata
+      await integrations.update(integration.id, {
+        lastSyncAt: now,
+        lastSyncStatus: "ok",
+        lastSyncCount: stamped.length,
+        status: "connected",
+      });
+
+      logActivity({
+        entity: "integration", entity_id: integration.id, action: "synced",
+        message: `${integration.provider}: ${stamped.length} position${stamped.length === 1 ? "" : "s"} synced`,
+        tag: "integration",
+      });
+
+      return stamped;
+    },
+    async markError(id, message) {
+      return integrations.update(id, {
+        status: "error",
+        lastSyncAt: new Date().toISOString(),
+        lastSyncStatus: message,
+      });
+    },
+  };
+
   function findInvestment(id) {
     return window.investments.find((x) => x.id === id);
   }
@@ -909,7 +1079,7 @@
     sb, isConfigured, auth,
     list, insert, update, remove, logActivity,
     hydrate, snapshotNetWorth,
-    investments, loans, trading, projects, income, contracts, team,
+    investments, loans, trading, projects, income, contracts, team, integrations,
     helpers: { fmtDate, parseDate, fmtFileSize, initialsFrom, relTime },
     builders: { aggregateIncomeMonthly, buildUpcoming, buildBreakdown, computeNetWorthSeries },
   };

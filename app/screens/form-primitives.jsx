@@ -321,6 +321,15 @@ const QuickAddMenu = ({ open, onClose, onPick }) => {
           <div className="meta">Construction progress, photos, milestones</div>
         </span>
       </button>
+      <div className="qa-divider" />
+      <div className="qa-section">Connect</div>
+      <button className="qa-item" onClick={() => onPick("integration")}>
+        <span className="ic"><Icon name="link" size={14} /></span>
+        <span style={{ flex: 1 }}>
+          Link account
+          <div className="meta">Binance, Kraken, Coinbase, IBKR…</div>
+        </span>
+      </button>
     </div>
   );
 };

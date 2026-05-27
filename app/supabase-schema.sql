@@ -341,6 +341,42 @@ create policy "auth_delete_contracts" on storage.objects
   for delete using ( bucket_id = 'contracts' and auth.uid() is not null );
 
 -- =============================================================
+-- 12. INTEGRATIONS — external account connections (brokers, exchanges, banks)
+-- =============================================================
+-- Stores read-only API credentials so the app can sync positions and
+-- balances on demand. Secrets live behind RLS (owner-only) — for stronger
+-- protection use Supabase Vault and reference the secret id here instead.
+create table if not exists public.integrations (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  provider text not null,                  -- 'binance' | 'kraken' | 'coinbase' | 'ibkr' | 'manual' | ...
+  label text,                              -- user-given nickname, e.g. "Binance · main"
+  api_key text,
+  api_secret text,
+  passphrase text,                         -- for OKX / KuCoin / etc.
+  endpoint text,                           -- override base URL (e.g. local IBKR gateway)
+  status text default 'connected',         -- 'connected' | 'paused' | 'error'
+  scope text default 'read',               -- 'read' | 'trade' (we always recommend read)
+  last_sync_at timestamptz,
+  last_sync_status text,                   -- 'ok' or error message
+  last_sync_count int default 0,
+  metadata jsonb default '{}'::jsonb,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+alter table public.integrations enable row level security;
+create policy "auth_all_integrations" on public.integrations for all
+  using ( auth.uid() = user_id ) with check ( auth.uid() = user_id );
+
+-- Track which integration a position originated from so we can do clean
+-- re-syncs without nuking manually-entered rows.
+alter table public.positions
+  add column if not exists source text default 'manual',         -- 'manual' | 'binance' | 'kraken' | ...
+  add column if not exists integration_id uuid references public.integrations(id) on delete set null,
+  add column if not exists external_id text,                     -- provider-specific identifier
+  add column if not exists last_synced_at timestamptz;
+
+-- =============================================================
 -- Indexes for common queries
 -- =============================================================
 create index if not exists income_records_user_received on public.income_records (user_id, received_on desc);
@@ -349,3 +385,5 @@ create index if not exists loans_user_due on public.loans (user_id, due_on);
 create index if not exists trades_user_executed on public.trades (user_id, executed_on desc);
 create index if not exists contracts_user_expires on public.contracts (user_id, expires_date);
 create index if not exists activity_user_created on public.activity_log (user_id, created_at desc);
+create index if not exists integrations_user on public.integrations (user_id, provider);
+create index if not exists positions_user_source on public.positions (user_id, source);

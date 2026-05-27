@@ -128,6 +128,7 @@ const TradingScreen = () => {
               <thead>
                 <tr>
                   <th>Position</th>
+                  <th>Source</th>
                   <th>Class</th>
                   <th className="num">Qty</th>
                   <th className="num">Avg Cost</th>
@@ -143,11 +144,13 @@ const TradingScreen = () => {
                   const value = p.qty * p.last;
                   const cost = p.qty * p.avg;
                   const pnl = value - cost;
-                  const pct = ((p.last - p.avg) / p.avg) * 100;
+                  const pct = p.avg > 0 ? ((p.last - p.avg) / p.avg) * 100 : 0;
                   // fake sparkline data
                   const spark = Array.from({ length: 18 }, (_, i) => p.avg + (p.last - p.avg) * (i / 17) * (0.8 + Math.sin(i + p.sym.charCodeAt(0)) * 0.18));
+                  const src = p.source || "manual";
+                  const srcLabel = src === "manual" ? "Manual" : (window.connectors?.get?.(src)?.label || src);
                   return (
-                    <tr key={p.sym} className="clickable">
+                    <tr key={p.id || p.sym} className="clickable">
                       <td>
                         <div className="row gap-3">
                           <div style={{ width: 32, height: 32, borderRadius: 8, background: "var(--canvas)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 600, fontSize: 11, color: p.cls === "Crypto" ? "var(--negative)" : "var(--ink)" }}>{p.sym.slice(0,1)}</div>
@@ -156,6 +159,16 @@ const TradingScreen = () => {
                             <div className="muted" style={{ fontSize: 11 }}>{p.name}</div>
                           </div>
                         </div>
+                      </td>
+                      <td>
+                        {src === "manual" ? (
+                          <span className="chip" style={{ fontSize: 10, opacity: 0.7 }}>Manual</span>
+                        ) : (
+                          <span className="row gap-2" style={{ alignItems: "center" }}>
+                            <ProviderBadge id={src} size={18} />
+                            <span style={{ fontSize: 11 }}>{srcLabel}</span>
+                          </span>
+                        )}
                       </td>
                       <td><span className="chip ghost">{p.cls}</span></td>
                       <td className="num mono">{p.qty}</td>
@@ -178,35 +191,55 @@ const TradingScreen = () => {
             </table>
           </div>
 
-          {/* Recent activity */}
+          {/* Connected sources */}
           <div className="card span-8">
-            <div className="eyebrow" style={{ marginBottom: 12 }}>Recent trades</div>
-            <table className="table">
-              <thead>
-                <tr><th>Date</th><th>Action</th><th>Symbol</th><th className="num">Qty</th><th className="num">Price</th><th className="num">Total</th><th>Venue</th></tr>
-              </thead>
-              <tbody>
-                {[
-                  ["May 22", "Buy",  "NVDA",  10,   487.20, "Interactive Brokers"],
-                  ["May 20", "Sell", "AAPL",  25,   192.10, "Interactive Brokers"],
-                  ["May 18", "Buy",  "SOL",   8,    158.20, "Coinbase"],
-                  ["May 14", "Buy",  "VOO",   12,   498.30, "Interactive Brokers"],
-                  ["May 10", "Sell", "BTC",   0.15, 67200,  "Kraken"],
-                  ["May 06", "Buy",  "ASML",  4,    868.40, "Interactive Brokers"],
-                  ["May 02", "Buy",  "ETH",   1.2,  3580,   "Coinbase"],
-                ].map((r, i) => (
-                  <tr key={i}>
-                    <td className="mono" style={{ fontSize: 12 }}>{r[0]}</td>
-                    <td><span className={`chip ${r[1] === "Buy" ? "pos" : "neg"}`}>{r[1]}</span></td>
-                    <td style={{ fontWeight: 500 }}>{r[2]}</td>
-                    <td className="num mono">{r[3]}</td>
-                    <td className="num mono">${r[4].toLocaleString()}</td>
-                    <td className="num mono">${(r[3]*r[4]).toLocaleString(undefined, { maximumFractionDigits: 0 })}</td>
-                    <td className="muted" style={{ fontSize: 11 }}>{r[5]}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <div className="row between" style={{ marginBottom: 12 }}>
+              <div className="eyebrow">Connected sources</div>
+              <button className="btn sm" onClick={() => window.__nav?.("integrations") || (window.location.hash = "#integrations")}>
+                Manage <Icon name="arrowRight" size={12} />
+              </button>
+            </div>
+            {(window.integrations || []).length === 0 ? (
+              <div className="muted" style={{ fontSize: 13, padding: "16px 0", lineHeight: 1.6 }}>
+                No external accounts linked yet. Connect Binance, Kraken, Coinbase or IBKR from{" "}
+                <a style={{ cursor: "pointer", color: "var(--ink)" }} onClick={() => window.__nav?.("integrations")}>Integrations</a>{" "}
+                to auto-sync your positions.
+              </div>
+            ) : (
+              <div className="col gap-3">
+                {(window.integrations || []).map((i) => {
+                  const c = window.connectors?.get?.(i.provider);
+                  const syncedCount = (window.tradingPositions || []).filter((p) => p.integrationId === i.id).length;
+                  return (
+                    <div key={i.id} className="row between" style={{ padding: "10px 0", borderBottom: "1px solid var(--line-2)" }}>
+                      <div className="row gap-3" style={{ alignItems: "center" }}>
+                        <ProviderBadge id={i.provider} size={28} />
+                        <div>
+                          <div style={{ fontSize: 13, fontWeight: 500 }}>{i.label || c?.label || i.provider}</div>
+                          <div className="muted" style={{ fontSize: 11 }}>{syncedCount} synced · {c?.kind || ""}</div>
+                        </div>
+                      </div>
+                      <div className="row gap-3" style={{ alignItems: "center" }}>
+                        <span className={`chip ${i.status === "error" ? "neg" : i.status === "paused" ? "warn" : "pos"}`} style={{ fontSize: 10 }}>
+                          {i.status === "error" ? "Sync error" : i.status === "paused" ? "Paused" : "Live"}
+                        </span>
+                        <button
+                          className="btn ghost sm"
+                          onClick={async () => {
+                            try { await window.connectors.sync(i); window.__toast?.(`${i.label || i.provider} synced.`); }
+                            catch (e) { window.__toast?.(e.message || "Sync failed"); }
+                            window.__bumpRev?.();
+                          }}
+                          title="Sync now"
+                        >
+                          <Icon name="refresh" size={12} />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* Watchlist */}

@@ -467,8 +467,12 @@ const teamActivity = [
   { t: "5 days ago",  who: "Kobby Ghanney", msg: "Invited Yusuf Al-Hassan as Accountant (Dubai)",      tag: "team" },
 ];
 
+// Integrations start empty — they are populated from Supabase on hydrate.
+const integrations = [];
+
 Object.assign(window, {
   contracts, siteUpdates, team, teamActivity,
+  integrations,
   ROLE_PRESETS, ROLE_PERMS, MODULES,
   CONTRACT_TYPES, STATUS_CHIP, daysUntil,
 });

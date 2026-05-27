@@ -28,8 +28,8 @@
     { sym: "BTC",     source: "coingecko",   ref: "bitcoin", priceDp: 2 },
     { sym: "ETH",     source: "coingecko",   ref: "ethereum",priceDp: 2 },
     { sym: "SOL",     source: "coingecko",   ref: "solana",  priceDp: 2 },
-    { sym: "GHS/USD", source: "frankfurter", ref: "GHS",     priceDp: 4 },
-    { sym: "AED/USD", source: "frankfurter", ref: "AED",     priceDp: 4 },
+    { sym: "USD/GHS", source: "frankfurter", ref: "GHS",     priceDp: 2 },
+    { sym: "USD/AED", source: "frankfurter", ref: "AED",     priceDp: 2 },
   ];
 
   const state = {
@@ -79,15 +79,23 @@
       const r = latest.rates?.[t.ref];
       const p = prior.rates?.[t.ref];
       if (r == null) return;
-      // We display the local currency expressed in USD (e.g. 1 GHS = $0.067)
-      const priceInUsd = 1 / r;
-      const priorInUsd = p ? 1 / p : null;
-      const delta = priorInUsd ? ((priceInUsd - priorInUsd) / priorInUsd) * 100 : 0;
+      // Frankfurter "USD->GHS" returns the # of GHS one USD buys, which is
+      // exactly the conventional USD/GHS quote we want to display.
+      const price = r;
+      const delta = p ? ((r - p) / p) * 100 : 0;
       state.cache.set(t.sym, {
-        price: priceInUsd,
+        price,
         delta,
         priceDp: t.priceDp,
       });
+      // Also push the live rate into the conversion engine so all
+      // money formatting across the app stays in sync.
+      if (window.FX_RATES && t.ref in window.FX_RATES) {
+        window.FX_RATES[t.ref] = r;
+      }
+      if (window.FX_RATES_PREV && t.ref in window.FX_RATES_PREV && p != null) {
+        window.FX_RATES_PREV[t.ref] = p;
+      }
     });
   }
 

@@ -145,6 +145,7 @@ const App = () => {
     setRoute({ page, id });
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
+  window.__nav = nav;
 
   // Render the form currently open
   const renderForm = () => {
@@ -161,6 +162,14 @@ const App = () => {
       case "site-update": return <SiteUpdateForm onClose={close} {...(openForm.props || {})} />;
       case "team":        return <TeamInviteForm onClose={close} />;
       case "team-edit":   return <TeamInviteForm onClose={close} {...(openForm.props || {})} />;
+      case "integration": return (
+        <IntegrationFormPanel
+          open
+          providerId={openForm.props?.providerId || "binance"}
+          editing={openForm.props?.editing || null}
+          onClose={close}
+        />
+      );
       default: return null;
     }
   };
@@ -253,8 +262,9 @@ const App = () => {
         {page === "loans"       && <LoansScreen onNav={nav} focused={route.id} />}
         {page === "projects"    && <ProjectsScreen />}
         {page === "contracts"   && <ContractsScreen onNav={nav} focused={route.id} />}
-        {page === "networth"    && <NetWorthScreen />}
-        {page === "team"        && <TeamScreen />}
+        {page === "networth"     && <NetWorthScreen />}
+        {page === "team"         && <TeamScreen />}
+        {page === "integrations" && <IntegrationsScreen />}
       </ShellWrap>
 
       <CommandPalette
