@@ -343,12 +343,16 @@ const MarketTape = ({ variant = "scroll", compact = false }) => {
             </span>
           </div>
         ))}
-        {!empty && last && (
-          <div className="muted row" style={{ padding: compact ? "10px 18px" : "12px 20px", fontSize: 10, whiteSpace: "nowrap", marginLeft: "auto" }}>
-            <span className="dot pos" style={{ marginRight: 6 }} />
-            live · {last.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-          </div>
-        )}
+        {!empty && last && (() => {
+          const gf = (window.integrations || []).find((i) => i.provider === "googlefinance" && i.status !== "paused" && i.status !== "error");
+          const sourceLabel = gf ? "Google Finance" : "live";
+          return (
+            <div className="muted row" style={{ padding: compact ? "10px 18px" : "12px 20px", fontSize: 10, whiteSpace: "nowrap", marginLeft: "auto" }}>
+              <span className="dot pos" style={{ marginRight: 6 }} />
+              {sourceLabel} · {last.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+            </div>
+          );
+        })()}
       </div>
     </div>
   );

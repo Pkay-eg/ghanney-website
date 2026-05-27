@@ -158,11 +158,34 @@
   let timer = null;
   let inflight = false;
 
+  // If the user has connected a Google Finance integration, defer to it
+  // exclusively. The connector overwrites window.tradingTickers + FX_RATES
+  // itself, and we don't want to fight it.
+  async function refreshViaGoogleFinance() {
+    const integ = (window.integrations || []).find(
+      (i) => i.provider === "googlefinance" && i.status !== "paused"
+    );
+    if (!integ) return false;
+    try {
+      await window.connectors?.sync?.(integ);
+      return true;
+    } catch (e) {
+      console.warn("[tickers] Google Finance refresh failed, falling back:", e);
+      if (window.db?.integrations?.markError) {
+        window.db.integrations.markError(integ.id, e.message || String(e));
+      }
+      return false;
+    }
+  }
+
   async function refresh() {
     if (inflight) return;
     inflight = true;
     try {
-      // Independent — failures in one don't abort the others.
+      // 1) Try Google Finance first if the user has it wired up.
+      const used = await refreshViaGoogleFinance();
+      if (used) return;
+      // 2) Otherwise fall back to the public providers.
       await Promise.allSettled([loadCoinGecko(), loadFrankfurter(), loadYahoo()]);
       flushToWindow();
     } catch (e) {
@@ -188,6 +211,9 @@
     refresh,
     subscribe: (fn) => { state.listeners.add(fn); return () => state.listeners.delete(fn); },
     snapshot: () => ({ lastUpdated: state.lastUpdated, rows: [...(window.tradingTickers || [])] }),
+    // Internal — used by the Google Finance connector to wake the
+    // MarketTape after it has overwritten window.tradingTickers.
+    _notify: () => { state.lastUpdated = new Date(); notify(); },
   };
 
   // Auto-start as soon as the document is interactive. data.jsx is written

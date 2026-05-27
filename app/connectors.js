@@ -366,7 +366,143 @@
   };
 
   // ---------------------------------------------------------------
-  // 5. MANUAL — no-op connector for "add positions by hand"
+  // 5. GOOGLE FINANCE (via a Google Sheet running =GOOGLEFINANCE())
+  //
+  // Google killed their public Finance API in 2012 — the realistic
+  // way to use Google's live quotes is to point this connector at a
+  // Google Sheet containing =GOOGLEFINANCE() formulas and let the
+  // tape pull values via the public gviz endpoint (CORS-enabled,
+  // no API key, works for any "Anyone with link" sheet).
+  //
+  // Expected sheet layout (tab name: "tickers", row 1 = headers):
+  //
+  //   A: Symbol         (e.g. NVDA, BTC-USD, CURRENCY:USDGHS, ^GSPC)
+  //   B: Display        (e.g. NVDA, BTC, USD/GHS, S&P 500)
+  //   C: Type           (Stock | ETF | Crypto | FX | Index)
+  //   D: Price          =GOOGLEFINANCE(A2)
+  //   E: Change %       =GOOGLEFINANCE(A2,"changepct")   ← for stocks
+  //                   OR =(D2-INDEX(GOOGLEFINANCE(A2,"price",WORKDAY(TODAY(),-2),WORKDAY(TODAY(),-1)),2,2))
+  //                       / INDEX(...) * 100             ← for CURRENCY: pairs
+  //   F: Decimals       optional (2, 3, 4 — defaults sensibly)
+  // ---------------------------------------------------------------
+  const googlefinance = {
+    id: "googlefinance",
+    label: "Google Finance",
+    kind: "Market data · via Google Sheets",
+    asset: "Live quotes for tape, FX engine, and net worth",
+    needs: ["endpoint"],          // re-uses the endpoint field to store the sheet id
+    docsUrl: "https://support.google.com/docs/answer/3093281",
+    notes:
+      'Create a Google Sheet, add a tab named "tickers" with the columns documented in the sidebar tooltip, share it as "Anyone with the link can view", then paste the sheet ID (or full URL) below.',
+
+    extractSheetId(input) {
+      if (!input) return "";
+      const m = input.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
+      return (m ? m[1] : input).trim();
+    },
+
+    async _loadRows(creds) {
+      const id = this.extractSheetId(creds.endpoint || "");
+      if (!id) throw new Error("Provide a Google Sheet URL or ID.");
+      const url = `https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:csv&sheet=tickers`;
+      const res = await fetch(url);
+      if (!res.ok) {
+        if (res.status === 404) throw new Error('Sheet not found or no tab named "tickers". Check the sheet ID and tab name.');
+        if (res.status === 401 || res.status === 403) throw new Error('Sheet is not shared publicly. Set sharing to "Anyone with the link can view".');
+        throw new Error(`Google Sheets ${res.status}: ${res.statusText}`);
+      }
+      const text = await res.text();
+      const rows = parseCsv(text);
+      if (rows.length < 2) throw new Error('Sheet has no data rows — add at least one ticker beneath the header.');
+      // Drop header row and require at least Symbol + Display + Price
+      return rows.slice(1)
+        .filter((r) => (r[0] || "").trim() && (r[3] || "").trim())
+        .map((r) => ({
+          symbol:   (r[0] || "").trim(),
+          display:  (r[1] || r[0] || "").trim(),
+          type:     ((r[2] || "Stock").trim()),
+          price:    Number(String(r[3]).replace(/[,$]/g, "")),
+          delta:    Number(String(r[4] || "0").replace(/[,%]/g, "")) || 0,
+          decimals: r[5] ? Number(r[5]) : null,
+        }))
+        .filter((t) => !isNaN(t.price));
+    },
+
+    async test(creds) {
+      const rows = await this._loadRows(creds);
+      return {
+        sheetId: this.extractSheetId(creds.endpoint || ""),
+        tickers: rows.length,
+        sample: rows.slice(0, 3).map((r) => `${r.display}: ${r.price}`),
+      };
+    },
+
+    // Push everything into window.tradingTickers + window.FX_RATES.
+    // Returns [] for the positions sync (this provider doesn't manage holdings).
+    async syncPositions(creds) {
+      const rows = await this._loadRows(creds);
+
+      // Re-build the tape from this sheet, preserving the configured order
+      const arr = rows.map((r) => ({
+        sym:     r.display,
+        price:   r.price,
+        delta:   r.delta,
+        priceDp: r.decimals != null ? r.decimals : (r.price >= 100 ? 2 : r.price >= 1 ? 3 : 4),
+      }));
+      if (Array.isArray(window.tradingTickers)) {
+        window.tradingTickers.length = 0;
+        arr.forEach((row) => window.tradingTickers.push(row));
+      } else {
+        window.tradingTickers = arr;
+      }
+
+      // Update the conversion engine when the user has FX rows.
+      // We expect rows like { display: "USD/GHS", type: "FX", price: 14.5 }
+      rows.forEach((r) => {
+        if ((r.type || "").toUpperCase() !== "FX") return;
+        const m = r.display.match(/USD\s*\/\s*([A-Z]{3})/i);
+        if (!m) return;
+        const code = m[1].toUpperCase();
+        if (window.FX_RATES && code in window.FX_RATES) window.FX_RATES[code] = r.price;
+      });
+
+      // Mark this as the active feed so tickers.js stays out of the way
+      window.__googleFinanceActive = true;
+      window.__bumpRev?.();
+
+      // Notify any MarketTape subscribers so the UI repaints immediately
+      // (mirrors the notification path inside tickers.js).
+      if (window.tickers?._notify) window.tickers._notify();
+
+      return []; // Google Finance doesn't hold positions of its own
+    },
+  };
+
+  // Minimal CSV parser that handles quoted fields with embedded commas / quotes.
+  function parseCsv(text) {
+    const rows = [];
+    let row = [], field = "", inQuotes = false;
+    for (let i = 0; i < text.length; i++) {
+      const c = text[i], n = text[i + 1];
+      if (inQuotes) {
+        if (c === '"' && n === '"') { field += '"'; i++; }
+        else if (c === '"') inQuotes = false;
+        else field += c;
+      } else {
+        if (c === '"') inQuotes = true;
+        else if (c === ",") { row.push(field); field = ""; }
+        else if (c === "\n" || c === "\r") {
+          if (field || row.length) { row.push(field); rows.push(row); row = []; field = ""; }
+          if (c === "\r" && n === "\n") i++;
+        } else field += c;
+      }
+    }
+    if (field || row.length) { row.push(field); rows.push(row); }
+    return rows;
+  }
+
+  // ---------------------------------------------------------------
+  // 6. MANUAL — no-op connector for "add positions by hand"
   // ---------------------------------------------------------------
   const manual = {
     id: "manual",
@@ -382,7 +518,7 @@
   // ---------------------------------------------------------------
   // Catalog
   // ---------------------------------------------------------------
-  const CATALOG = [binance, kraken, coinbase, ibkr, manual];
+  const CATALOG = [googlefinance, binance, kraken, coinbase, ibkr, manual];
 
   window.connectors = {
     list: () => CATALOG,
@@ -392,6 +528,25 @@
     async sync(integration) {
       const c = CATALOG.find((x) => x.id === integration.provider);
       if (!c) throw new Error(`Unknown provider: ${integration.provider}`);
+
+      // Google Finance is a market-data source, not a position source.
+      // It updates the tape + FX engine and reports its own sync metadata
+      // (number of tickers, not number of holdings).
+      if (c.id === "googlefinance") {
+        const rows = await c._loadRows(integration);
+        await c.syncPositions(integration); // performs the actual data push
+        if (window.db?.integrations?.update) {
+          await window.db.integrations.update(integration.id, {
+            lastSyncAt: new Date().toISOString(),
+            lastSyncStatus: "ok",
+            lastSyncCount: rows.length,
+            status: "connected",
+            metadata: { ...(integration.metadata || {}), kind: "market-data", tickerCount: rows.length },
+          });
+        }
+        return [];
+      }
+
       const positions = await c.syncPositions(integration);
       if (window.db?.integrations?.syncPositions) {
         await window.db.integrations.syncPositions(integration, positions);

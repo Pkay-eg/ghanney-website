@@ -5,11 +5,12 @@
 // =========================================================
 
 const PROVIDER_BADGE = {
-  binance:  { color: "#F0B90B", letter: "B" },
-  kraken:   { color: "#5741D9", letter: "K" },
-  coinbase: { color: "#0052FF", letter: "C" },
-  ibkr:     { color: "#D71921", letter: "I" },
-  manual:   { color: "var(--ink)",  letter: "M" },
+  googlefinance: { color: "#4285F4", letter: "G" },
+  binance:       { color: "#F0B90B", letter: "B" },
+  kraken:        { color: "#5741D9", letter: "K" },
+  coinbase:      { color: "#0052FF", letter: "C" },
+  ibkr:          { color: "#D71921", letter: "I" },
+  manual:        { color: "var(--ink)",  letter: "M" },
 };
 
 const ProviderBadge = ({ id, size = 36 }) => {
@@ -22,6 +23,72 @@ const ProviderBadge = ({ id, size = 36 }) => {
       fontWeight: 700, fontSize: size * 0.42,
       letterSpacing: "-0.02em",
     }}>{b.letter}</div>
+  );
+};
+
+// ---------- Google Finance setup help (shown inside the connect modal) ----------
+const GoogleFinanceSetupHelp = () => {
+  const [copied, setCopied] = React.useState(false);
+  const sample =
+`Symbol\tDisplay\tType\tPrice\tChange %\tDecimals
+^GSPC\tS&P 500\tIndex\t=GOOGLEFINANCE(A2)\t=GOOGLEFINANCE(A2,"changepct")\t2
+^IXIC\tNASDAQ\tIndex\t=GOOGLEFINANCE(A3)\t=GOOGLEFINANCE(A3,"changepct")\t2
+NVDA\tNVDA\tStock\t=GOOGLEFINANCE(A4)\t=GOOGLEFINANCE(A4,"changepct")\t2
+TSLA\tTSLA\tStock\t=GOOGLEFINANCE(A5)\t=GOOGLEFINANCE(A5,"changepct")\t2
+BTC-USD\tBTC\tCrypto\t=GOOGLEFINANCE(A6)\t=GOOGLEFINANCE(A6,"changepct")\t2
+ETH-USD\tETH\tCrypto\t=GOOGLEFINANCE(A7)\t=GOOGLEFINANCE(A7,"changepct")\t2
+SOL-USD\tSOL\tCrypto\t=GOOGLEFINANCE(A8)\t=GOOGLEFINANCE(A8,"changepct")\t2
+CURRENCY:USDGHS\tUSD/GHS\tFX\t=GOOGLEFINANCE(A9)\t=(D9-INDEX(GOOGLEFINANCE(A9,"price",WORKDAY(TODAY(),-2),WORKDAY(TODAY(),-1)),2,2))/INDEX(GOOGLEFINANCE(A9,"price",WORKDAY(TODAY(),-2),WORKDAY(TODAY(),-1)),2,2)*100\t2
+CURRENCY:USDAED\tUSD/AED\tFX\t=GOOGLEFINANCE(A10)\t=(D10-INDEX(GOOGLEFINANCE(A10,"price",WORKDAY(TODAY(),-2),WORKDAY(TODAY(),-1)),2,2))/INDEX(GOOGLEFINANCE(A10,"price",WORKDAY(TODAY(),-2),WORKDAY(TODAY(),-1)),2,2)*100\t2`;
+
+  const copySample = async () => {
+    try {
+      await navigator.clipboard.writeText(sample);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    } catch (e) {
+      // fallback: select the textarea
+    }
+  };
+
+  return (
+    <div className="card" style={{ padding: 14, marginBottom: 16, background: "var(--surface-2)" }}>
+      <div className="eyebrow" style={{ marginBottom: 10 }}>Set-up — 4 steps</div>
+      <ol style={{ margin: 0, paddingLeft: 18, fontSize: 12.5, lineHeight: 1.65 }}>
+        <li>
+          <a href="https://docs.google.com/spreadsheets/create" target="_blank" rel="noreferrer" style={{ color: "var(--ink)" }}>
+            Create a blank Google Sheet
+          </a>
+          . Rename the first tab to <b>tickers</b>.
+        </li>
+        <li>
+          Paste the sample contents below (we provide the rows + formulas you need — edit symbols as you like).
+        </li>
+        <li>
+          File → Share → <b>Anyone with the link · Viewer</b>.
+        </li>
+        <li>
+          Copy the sheet's URL (or just its ID) and paste it into the field below.
+        </li>
+      </ol>
+
+      <div className="row between" style={{ marginTop: 12, marginBottom: 6 }}>
+        <span className="muted" style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em" }}>Starter template</span>
+        <button className="btn ghost sm" onClick={copySample}>
+          <Icon name={copied ? "check" : "download"} size={12} />
+          {copied ? "Copied" : "Copy"}
+        </button>
+      </div>
+      <pre style={{
+        background: "var(--canvas)", border: "1px solid var(--line-2)", borderRadius: 6,
+        padding: 10, fontSize: 10.5, fontFamily: "var(--font-mono)",
+        overflowX: "auto", maxHeight: 180, margin: 0, lineHeight: 1.6,
+      }}>{sample}</pre>
+      <div className="muted" style={{ fontSize: 11, marginTop: 10, lineHeight: 1.5 }}>
+        <b>Tip</b> — Google Finance does not return change% for currency pairs, so the FX rows use a
+        7-day historical lookup to compute it. Stock rows use the simpler <code>"changepct"</code> argument.
+      </div>
+    </div>
   );
 };
 
@@ -129,15 +196,27 @@ const IntegrationFormPanel = ({ open, onClose, providerId, editing }) => {
         </div>
       )}
 
+      {connector.id === "googlefinance" && <GoogleFinanceSetupHelp />}
+
       <FormSection title="Connection">
         <Field label="Label" hint="A nickname so you can tell connections apart later.">
           <Input value={form.label || ""} onChange={(v) => set("label", v)} placeholder={`${connector.label} · main`} />
         </Field>
 
         {needs.includes("endpoint") && (
-          <Field label="Gateway URL" required hint="e.g. https://localhost:5000/v1/api">
-            <Input value={form.endpoint || ""} onChange={(v) => set("endpoint", v)} placeholder="https://localhost:5000/v1/api" />
-          </Field>
+          connector.id === "googlefinance" ? (
+            <Field label="Google Sheet URL or ID" required hint="Paste the full sheet URL or just the ID portion.">
+              <Input
+                value={form.endpoint || ""}
+                onChange={(v) => set("endpoint", v)}
+                placeholder="https://docs.google.com/spreadsheets/d/1abc...XYZ/edit"
+              />
+            </Field>
+          ) : (
+            <Field label="Gateway URL" required hint="e.g. https://localhost:5000/v1/api">
+              <Input value={form.endpoint || ""} onChange={(v) => set("endpoint", v)} placeholder="https://localhost:5000/v1/api" />
+            </Field>
+          )
         )}
 
         {needs.includes("apiKey") && (
@@ -288,6 +367,9 @@ const IntegrationsScreen = () => {
               {live.map((i) => {
                 const c = catalog.find((cc) => cc.id === i.provider);
                 const positions = positionsBySource.get(i.id) || 0;
+                const isMarketData = i.provider === "googlefinance";
+                const itemCount = isMarketData ? (i.lastSyncCount || i.metadata?.tickerCount || 0) : positions;
+                const itemUnit = isMarketData ? "ticker" : "position";
                 const statusColor = i.status === "error" ? "var(--negative)" : i.status === "paused" ? "var(--warn)" : "var(--positive)";
                 return (
                   <div key={i.id} className="card" style={{ padding: 18 }}>
@@ -303,7 +385,7 @@ const IntegrationsScreen = () => {
                             </span>
                           </div>
                           <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>
-                            {c?.kind || i.provider} · last sync {fmtRel(i.lastSyncAt)} · {positions} position{positions === 1 ? "" : "s"}
+                            {c?.kind || i.provider} · last sync {fmtRel(i.lastSyncAt)} · {itemCount} {itemUnit}{itemCount === 1 ? "" : "s"}
                           </div>
                           {i.status === "error" && i.lastSyncStatus && (
                             <div className="neg mono" style={{ fontSize: 11, marginTop: 4 }}>

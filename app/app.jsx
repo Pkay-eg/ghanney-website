@@ -59,6 +59,9 @@ const App = () => {
         setMe(session.user);
         setHydrating(true);
         await window.db.hydrate();
+        // Now that integrations are loaded, re-run the ticker refresh so a
+        // Google Finance sheet (if configured) takes over from Yahoo/CoinGecko.
+        if (window.tickers?.refresh) window.tickers.refresh();
         setHydrating(false);
         setSignedIn(true);
       }
@@ -81,6 +84,7 @@ const App = () => {
       const session = await window.db.auth.getSession();
       if (session?.user) setMe(session.user);
       await window.db.hydrate();
+      if (window.tickers?.refresh) window.tickers.refresh();
       bumpRev();
     }
     setHydrating(false);
