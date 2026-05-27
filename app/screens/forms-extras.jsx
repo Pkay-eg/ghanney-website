@@ -221,7 +221,7 @@ const SiteUpdateForm = ({ onClose, defaultInvestmentId = null }) => {
 
   const inv = investments.find((i) => i.id === form.investmentId);
   // restrict to construction-stage investments
-  const eligibleInvestments = investments.filter((i) => i.kind.includes("Real Estate") || i.kind.includes("Government"));
+  const eligibleInvestments = investments.filter((i) => ((i.kind || "").includes("Real Estate") || (i.kind || "").includes("Government")));
 
   const submit = async () => {
     if (!form.investmentId || !form.milestone) { window.__toast?.("Pick an asset + milestone"); return; }

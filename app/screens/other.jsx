@@ -295,8 +295,8 @@ const ProjectsScreen = () => {
 // ---------- Net Worth ----------
 const NetWorthScreen = () => {
   const $ = useMoney();
-  const last = netWorthMonthly[netWorthMonthly.length - 1].value;
-  const first = netWorthMonthly[0].value;
+  const last = netWorthMonthly[netWorthMonthly.length - 1]?.value || 0;
+  const first = netWorthMonthly[0]?.value || 0;
   const totalGrowth = last - first;
 
   return (

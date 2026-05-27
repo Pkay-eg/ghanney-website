@@ -47,7 +47,7 @@ const DashboardExecutive = ({ onNav, showSensitive }) => {
   const tradingPnLAbs = tradingValue - tradingCost;
   const tradingPnLPct = (tradingPnLAbs / tradingCost) * 100;
 
-  const realEstateValue = investments.filter((i) => i.kind.includes("Real Estate")).reduce((s, i) => {
+  const realEstateValue = investments.filter((i) => (i.kind || "").includes("Real Estate")).reduce((s, i) => {
     return s + convertFx(i.valueNow, i.currency, "USD");
   }, 0);
 
@@ -120,11 +120,11 @@ const DashboardExecutive = ({ onNav, showSensitive }) => {
             <div className="hr" style={{ margin: "16px 0" }} />
             <div className="row between" style={{ fontSize: 12 }}>
               <span className="muted" style={{ whiteSpace: "nowrap" }}>Liquid · cash + trading</span>
-              <span className="mono" style={{ whiteSpace: "nowrap" }}>{$.fmtK(netWorthBreakdown[5].value + netWorthBreakdown[4].value)}</span>
+              <span className="mono" style={{ whiteSpace: "nowrap" }}>{$.fmtK((netWorthBreakdown[5]?.value || 0) + (netWorthBreakdown[4]?.value || 0))}</span>
             </div>
             <div className="row between" style={{ fontSize: 12, marginTop: 6 }}>
               <span className="muted" style={{ whiteSpace: "nowrap" }}>Illiquid · property + SPV</span>
-              <span className="mono" style={{ whiteSpace: "nowrap" }}>{$.fmtK(realEstateValue + 285000)}</span>
+              <span className="mono" style={{ whiteSpace: "nowrap" }}>{$.fmtK(realEstateValue)}</span>
             </div>
           </div>
 

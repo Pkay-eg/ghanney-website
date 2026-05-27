@@ -553,7 +553,12 @@
       return s + outstanding * fx;
     }, 0);
     if (loansValue) buckets["Loans receivable"] = loansValue;
-    return Object.entries(buckets).map(([label, value], i) => ({ label, value, color: colors[i % colors.length] }));
+    const list = Object.entries(buckets).map(([label, value], i) => ({ label, value, color: colors[i % colors.length] }));
+    // Always return at least one row so screens that index into it don't crash.
+    if (list.length === 0) {
+      return [{ label: "Nothing tracked yet", value: 0, color: colors[0] }];
+    }
+    return list;
   }
 
   function computeNetWorthSeries() {
