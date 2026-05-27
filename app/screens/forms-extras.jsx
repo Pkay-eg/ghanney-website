@@ -43,13 +43,13 @@ const ContractForm = ({ onClose, defaultLinkedTo = null }) => {
       label: (kind === "investment" ? investments.find((x) => x.id === id)?.name : kind === "loan" ? loans.find((x) => x.id === id)?.borrower : projects.find((x) => x.id === id)?.name) || "—",
     } : null;
 
-    const me = window.__me;
-    const myName = me?.user_metadata?.full_name || me?.email?.split("@")[0] || "Kobby";
+    const myInfo = window.__myInfo?.() || {};
+    const myName = myInfo.name || "Owner";
 
     const ct = {
       name: form.name,
       type: form.type,
-      parties: ["Kobby Ghanney", form.counterparty, ...(form.parties ? form.parties.split(",").map((s) => s.trim()) : [])],
+      parties: [myName, form.counterparty, ...(form.parties ? form.parties.split(",").map((s) => s.trim()) : [])],
       value: parseFloat(form.value) || 0,
       currency: form.currency,
       linkedTo: linked,

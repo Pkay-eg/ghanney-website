@@ -4,7 +4,7 @@
 
 const LoginScreen = ({ onSignIn }) => {
   const [mode, setMode] = useState("signin"); // signin | signup | reset
-  const [email, setEmail] = useState("kobby@ghanney.com");
+  const [email, setEmail] = useState("");
   const [pass, setPass] = useState("");
   const [fullName, setFullName] = useState("");
   const [show, setShow] = useState(false);
@@ -77,13 +77,13 @@ const LoginScreen = ({ onSignIn }) => {
           {mode === "signup" && (
             <div className="field">
               <label>Full name</label>
-              <input type="text" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Kobby Ghanney" autoComplete="name" />
+              <input type="text" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Your name" autoComplete="name" />
             </div>
           )}
 
           <div className="field">
             <label>Email</label>
-            <input type="email" value={email} onChange={(e) => { setEmail(e.target.value); setErr(""); }} autoComplete="email" />
+            <input type="email" value={email} onChange={(e) => { setEmail(e.target.value); setErr(""); }} placeholder="you@example.com" autoComplete="email" />
           </div>
 
           {mode !== "reset" && (

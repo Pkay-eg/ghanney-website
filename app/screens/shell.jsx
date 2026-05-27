@@ -65,13 +65,20 @@ const Sidebar = ({ active, onNav, mode }) => {
         alignItems: "center",
         padding: mode === "rail" ? "12px 0 0" : "12px 8px 0",
       }}>
-        <div className="avatar">KG</div>
-        {mode !== "rail" && (
-          <div className="col" style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 12.5, fontWeight: 500 }}>Kobby Ghanney</div>
-            <div className="muted" style={{ fontSize: 11 }}>Owner · Accra/Dubai</div>
-          </div>
-        )}
+        {(() => {
+          const me = (window.__myInfo?.() || {});
+          return (
+            <>
+              <div className="avatar">{me.initials || "U"}</div>
+              {mode !== "rail" && (
+                <div className="col" style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 12.5, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{me.name || "Member"}</div>
+                  <div className="muted" style={{ fontSize: 11, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{me.role || "Owner"}{me.location ? ` · ${me.location}` : ""}</div>
+                </div>
+              )}
+            </>
+          );
+        })()}
       </div>
     </aside>
   );

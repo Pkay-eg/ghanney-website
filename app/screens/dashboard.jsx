@@ -53,7 +53,7 @@ const DashboardExecutive = ({ onNav, showSensitive }) => {
 
   return (
     <div className="fade-in" data-screen-label="01 Overview">
-      <Topbar title="Welcome back, Kobby." subtitle={`Monday · ${new Date().toLocaleDateString("en-GB",{day:"2-digit",month:"long",year:"numeric"})}`} />
+      <Topbar title={`Welcome back, ${(window.__myInfo?.() || {}).first || "there"}.`} subtitle={`${new Date().toLocaleDateString("en-GB",{weekday:"long"})} · ${new Date().toLocaleDateString("en-GB",{day:"2-digit",month:"long",year:"numeric"})}`} />
 
       <div className="content">
         {/* Hero net worth */}

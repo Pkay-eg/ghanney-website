@@ -18,6 +18,31 @@ const App = () => {
   window.__closeForm = () => setOpenForm(null);
   window.__bumpRev = bumpRev;
   window.__me = me;
+  window.__myInfo = () => {
+    const u = window.__me;
+    if (!u) return { name: "", first: "", initials: "?", email: "", role: "Member", location: "" };
+    // Try profile from window.team first (loaded from DB), else fall back to auth metadata.
+    const profile = (window.team || []).find((m) => m.email === u.email) || null;
+    const fullName =
+      profile?.name ||
+      u.user_metadata?.full_name ||
+      (u.email ? u.email.split("@")[0] : "User");
+    const parts = fullName.trim().split(/\s+/);
+    const rawFirst = parts[0] || "there";
+    const first = rawFirst.charAt(0).toUpperCase() + rawFirst.slice(1);
+    const initials =
+      profile?.initials ||
+      parts.map((s) => s[0]).filter(Boolean).slice(0, 2).join("").toUpperCase() ||
+      "U";
+    return {
+      name: fullName,
+      first,
+      initials,
+      email: u.email,
+      role: profile?.role || "Owner",
+      location: profile?.location || "",
+    };
+  };
   window.__toast = (msg) => {
     setToast(msg);
     setTimeout(() => setToast(null), 2400);
