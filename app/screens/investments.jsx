@@ -33,10 +33,10 @@ const InvestmentsList = ({ onNav, display = "cards", focused }) => {
             const outstanding = totalCommit - totalPaid;
             return (
               <>
-                <KPI eyebrow="Total committed" value={$.fmtK(totalCommit)} sub="Across 7 positions" />
-                <KPI eyebrow="Funded to date" value={$.fmtK(totalPaid)} sub={`${Math.round((totalPaid/totalCommit)*100)}% of commitments`} />
-                <KPI eyebrow="Outstanding" value={$.fmtK(outstanding)} sub="Remaining instalments" delta={null} />
-                <KPI eyebrow="Current value" value={$.fmtK(totalNow)} sub={`+${(((totalNow-totalCommit)/totalCommit)*100).toFixed(1)}% unrealised`} delta={+9.8} />
+                <KPI eyebrow="Total committed" value={$.fmtK(totalCommit)} sub={investments.length ? `Across ${investments.length} position${investments.length === 1 ? "" : "s"}` : "No investments recorded"} />
+                <KPI eyebrow="Funded to date" value={$.fmtK(totalPaid)} sub={totalCommit > 0 ? `${Math.round((totalPaid/totalCommit)*100)}% of commitments` : "—"} />
+                <KPI eyebrow="Outstanding" value={$.fmtK(outstanding)} sub={outstanding > 0 ? "Remaining instalments" : "—"} delta={null} />
+                <KPI eyebrow="Current value" value={$.fmtK(totalNow)} sub={totalCommit > 0 ? `${(((totalNow-totalCommit)/totalCommit) * 100 >= 0 ? "+" : "")}${(((totalNow-totalCommit)/totalCommit)*100).toFixed(1)}% unrealised` : "—"} delta={totalCommit > 0 ? ((totalNow-totalCommit)/totalCommit)*100 : null} />
               </>
             );
           })()}

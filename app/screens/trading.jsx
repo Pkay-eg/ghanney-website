@@ -10,7 +10,7 @@ const TradingScreen = () => {
   const totalValue = tradingPositions.reduce((s, p) => s + p.qty * p.last, 0);
   const totalCost  = tradingPositions.reduce((s, p) => s + p.qty * p.avg, 0);
   const pnlAbs = totalValue - totalCost;
-  const pnlPct = (pnlAbs / totalCost) * 100;
+  const pnlPct = totalCost > 0 ? (pnlAbs / totalCost) * 100 : null;
 
   const cryptoValue = tradingPositions.filter((p) => p.cls === "Crypto").reduce((s, p) => s + p.qty * p.last, 0);
   const stockValue = tradingPositions.filter((p) => p.cls === "Stock").reduce((s, p) => s + p.qty * p.last, 0);
@@ -20,18 +20,8 @@ const TradingScreen = () => {
     <div className="fade-in" data-screen-label="04 Trading">
       <Topbar title="Trading desk" subtitle="Markets" />
       <div className="content">
-        {/* tape */}
-        <div className="card tight" style={{ marginBottom: 20, overflow: "hidden", padding: 0 }}>
-          <div className="row" style={{ overflowX: "auto" }}>
-            {tradingTickers.concat(tradingTickers).map((t, i) => (
-              <div key={i} className="row gap-3" style={{ padding: "12px 20px", borderRight: "1px solid var(--line-2)", whiteSpace: "nowrap" }}>
-                <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.04em" }}>{t.sym}</span>
-                <span className="mono" style={{ fontSize: 12 }}>{t.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}</span>
-                <span className={`mono ${t.delta >= 0 ? "pos" : "neg"}`} style={{ fontSize: 11 }}>{t.delta >= 0 ? "▲" : "▼"} {Math.abs(t.delta).toFixed(2)}%</span>
-              </div>
-            ))}
-          </div>
-        </div>
+        {/* tape — live data from CoinGecko (crypto) + Frankfurter (FX) + Yahoo (stocks) */}
+        <MarketTape />
 
         <div className="grid-12">
           {/* Big P&L */}
@@ -42,8 +32,14 @@ const TradingScreen = () => {
                 <div style={{ marginTop: 8 }}><Display value={totalValue} /></div>
                 <div className="row gap-3" style={{ marginTop: 10 }}>
                   <Delta value={pnlPct} />
-                  <span className="muted" style={{ fontSize: 12.5 }}>unrealised · </span>
-                  <span className="mono pos" style={{ fontSize: 12.5 }}>+${pnlAbs.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                  {pnlPct != null ? (
+                    <>
+                      <span className="muted" style={{ fontSize: 12.5 }}>unrealised · </span>
+                      <span className={`mono ${pnlAbs >= 0 ? "pos" : "neg"}`} style={{ fontSize: 12.5 }}>{pnlAbs >= 0 ? "+" : "-"}${Math.abs(pnlAbs).toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                    </>
+                  ) : (
+                    <span className="muted" style={{ fontSize: 12.5 }}>No positions yet</span>
+                  )}
                 </div>
               </div>
               <div className="row gap-2">
@@ -53,35 +49,64 @@ const TradingScreen = () => {
               </div>
             </div>
             <div style={{ marginTop: 18 }}>
-              <AreaChart data={tradingPnL} valueKey="v" color="var(--accent)" height={220}
-                formatY={(v) => "$" + (v/1000).toFixed(0) + "K"} formatTip={(v) => "$" + v.toLocaleString()} />
+              {tradingPositions.length === 0 ? (
+                <div className="muted" style={{ padding: "32px 0", textAlign: "center", fontSize: 13 }}>
+                  No P&L yet — record your first trade with <b style={{ color: "var(--ink)" }}>+ New</b>.
+                </div>
+              ) : (
+                <AreaChart data={tradingPnL} valueKey="v" color="var(--accent)" height={220}
+                  formatY={(v) => "$" + (v/1000).toFixed(0) + "K"} formatTip={(v) => "$" + v.toLocaleString()} />
+              )}
             </div>
           </div>
 
           {/* allocation */}
           <div className="card pad-lg span-4">
             <div className="eyebrow" style={{ marginBottom: 14 }}>Allocation</div>
-            <div className="row gap-4" style={{ alignItems: "center" }}>
-              <Donut
-                data={[
-                  { label: "Stocks", value: stockValue, color: "var(--ink)" },
-                  { label: "Crypto", value: cryptoValue, color: "var(--negative)" },
-                  { label: "ETFs", value: etfValue, color: "var(--positive)" },
-                ]}
-                size={140} thickness={18}
-              />
-              <div className="col gap-3" style={{ flex: 1, fontSize: 12 }}>
-                <div className="row between"><span className="row gap-2"><span style={{ width: 8, height: 8, borderRadius: 2, background: "var(--ink)" }} />Stocks</span><span className="mono">${(stockValue/1000).toFixed(0)}K</span></div>
-                <div className="row between"><span className="row gap-2"><span style={{ width: 8, height: 8, borderRadius: 2, background: "var(--negative)" }} />Crypto</span><span className="mono">${(cryptoValue/1000).toFixed(0)}K</span></div>
-                <div className="row between"><span className="row gap-2"><span style={{ width: 8, height: 8, borderRadius: 2, background: "var(--positive)" }} />ETFs</span><span className="mono">${(etfValue/1000).toFixed(0)}K</span></div>
+            {tradingPositions.length === 0 ? (
+              <div className="muted" style={{ padding: "60px 0", textAlign: "center", fontSize: 13 }}>
+                No positions yet.
               </div>
-            </div>
-            <div className="hr" style={{ margin: "16px 0" }} />
-            <div className="col gap-3" style={{ fontSize: 12 }}>
-              <div className="row between"><span className="muted">Best performer</span><span>NVDA <span className="pos mono">+18.0%</span></span></div>
-              <div className="row between"><span className="muted">Worst performer</span><span>BTC <span className="neg mono">−1.1% (24h)</span></span></div>
-              <div className="row between"><span className="muted">Total trades · 30d</span><span className="mono">42</span></div>
-            </div>
+            ) : (
+              <>
+                <div className="row gap-4" style={{ alignItems: "center" }}>
+                  <Donut
+                    data={[
+                      { label: "Stocks", value: stockValue, color: "var(--ink)" },
+                      { label: "Crypto", value: cryptoValue, color: "var(--negative)" },
+                      { label: "ETFs", value: etfValue, color: "var(--positive)" },
+                    ]}
+                    size={140} thickness={18}
+                  />
+                  <div className="col gap-3" style={{ flex: 1, fontSize: 12 }}>
+                    <div className="row between"><span className="row gap-2"><span style={{ width: 8, height: 8, borderRadius: 2, background: "var(--ink)" }} />Stocks</span><span className="mono">${(stockValue/1000).toFixed(0)}K</span></div>
+                    <div className="row between"><span className="row gap-2"><span style={{ width: 8, height: 8, borderRadius: 2, background: "var(--negative)" }} />Crypto</span><span className="mono">${(cryptoValue/1000).toFixed(0)}K</span></div>
+                    <div className="row between"><span className="row gap-2"><span style={{ width: 8, height: 8, borderRadius: 2, background: "var(--positive)" }} />ETFs</span><span className="mono">${(etfValue/1000).toFixed(0)}K</span></div>
+                  </div>
+                </div>
+                <div className="hr" style={{ margin: "16px 0" }} />
+                {(() => {
+                  const ranked = tradingPositions
+                    .map((p) => ({ sym: p.sym, pct: p.avg > 0 ? ((p.last - p.avg) / p.avg) * 100 : 0 }))
+                    .sort((a, b) => b.pct - a.pct);
+                  const best = ranked[0];
+                  const worst = ranked[ranked.length - 1];
+                  return (
+                    <div className="col gap-3" style={{ fontSize: 12 }}>
+                      <div className="row between">
+                        <span className="muted">Best performer</span>
+                        <span>{best.sym} <span className={`mono ${best.pct >= 0 ? "pos" : "neg"}`}>{best.pct >= 0 ? "+" : ""}{best.pct.toFixed(1)}%</span></span>
+                      </div>
+                      <div className="row between">
+                        <span className="muted">Worst performer</span>
+                        <span>{worst.sym} <span className={`mono ${worst.pct >= 0 ? "pos" : "neg"}`}>{worst.pct >= 0 ? "+" : ""}{worst.pct.toFixed(1)}%</span></span>
+                      </div>
+                      <div className="row between"><span className="muted">Open positions</span><span className="mono">{tradingPositions.length}</span></div>
+                    </div>
+                  );
+                })()}
+              </>
+            )}
           </div>
 
           {/* positions table */}

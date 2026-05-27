@@ -5,23 +5,30 @@
 // ---------- Income ----------
 const IncomeScreen = () => {
   const $ = useMoney();
-  const ytd = incomeMonthly.reduce((s, m) => s + m.commission + m.referral, 0); // already USD
-  // accrued salaries normalized to USD
+  const ytd = incomeMonthly.reduce((s, m) => s + (m.commission || 0) + (m.referral || 0), 0);
   const accruedUsd = incomeStreams
     .filter((s) => s.status === "Deferred")
     .reduce((s, x) => s + convertFx(x.accrued, x.currency, "USD"), 0);
-  const last3 = incomeMonthly.slice(-3).reduce((s, m) => s + m.commission + m.referral, 0);
+  const last3 = incomeMonthly.slice(-3).reduce((s, m) => s + (m.commission || 0) + (m.referral || 0), 0);
+  const prev3 = incomeMonthly.slice(-6, -3).reduce((s, m) => s + (m.commission || 0) + (m.referral || 0), 0);
   const avg = last3 / 3;
+  const ytdDelta = prev3 > 0 ? ((last3 - prev3) / prev3) * 100 : null;
+  const accruedSpark = accruedUsd
+    ? Array.from({ length: 12 }, (_, i) => Math.round(accruedUsd * (i + 1) / 12))
+    : null;
+  const inflowSpark = ytd ? incomeMonthly.map((m) => (m.commission || 0) + (m.referral || 0)) : null;
+  const subStreams = incomeStreams.filter((s) => s.status === "Deferred").length;
+  const deferredSub = subStreams > 0 ? `${subStreams} deferred salary stream${subStreams === 1 ? "" : "s"}` : "No deferred salaries";
 
   return (
     <div className="fade-in" data-screen-label="02 Income">
       <Topbar title="Income" subtitle="Earnings" />
       <div className="content">
         <div className="grid-4" style={{ marginBottom: 24 }}>
-          <KPI eyebrow="YTD earned · live" value={$.fmtK(ytd)} sub="Commissions + referrals · 12 mo" delta={18.4} sparkData={incomeMonthly.map((m)=>m.commission+m.referral)} sparkColor="var(--positive)" />
-          <KPI eyebrow="3-mo avg" value={$.fmtK(avg)} sub="Trailing monthly" />
-          <KPI eyebrow="Salaries · accrued" value={$.fmtK(accruedUsd)} sub="Deferred · ₵ Ghana + Dh Dubai" sparkData={[0,20.5,41,61.5,82,102.5,123,143.5,164,184.5,200,213.5]} sparkColor="var(--warn)" />
-          <KPI eyebrow="Total income · 12mo" value={$.fmtK(ytd+accruedUsd)} sub="If salaries were paid" delta={null} />
+          <KPI eyebrow="YTD earned · live" value={$.fmtK(ytd)} sub={ytd ? "Commissions + referrals · 12 mo" : "No income recorded yet"} delta={ytdDelta} sparkData={inflowSpark} sparkColor="var(--positive)" />
+          <KPI eyebrow="3-mo avg" value={$.fmtK(avg)} sub={last3 ? "Trailing monthly" : "—"} />
+          <KPI eyebrow="Salaries · accrued" value={$.fmtK(accruedUsd)} sub={deferredSub} sparkData={accruedSpark} sparkColor="var(--warn)" />
+          <KPI eyebrow="Total income · 12mo" value={$.fmtK(ytd+accruedUsd)} sub={ytd + accruedUsd > 0 ? "If salaries were paid" : "—"} delta={null} />
         </div>
 
         <div className="grid-12">
@@ -298,6 +305,7 @@ const NetWorthScreen = () => {
   const last = netWorthMonthly[netWorthMonthly.length - 1]?.value || 0;
   const first = netWorthMonthly[0]?.value || 0;
   const totalGrowth = last - first;
+  const growthPct = first > 0 ? ((last - first) / first) * 100 : null;
 
   return (
     <div className="fade-in" data-screen-label="07 Net Worth">
@@ -310,9 +318,9 @@ const NetWorthScreen = () => {
                 <div className="eyebrow">Net worth · {$.display}</div>
                 <div style={{ marginTop: 10 }}><Display value={last} from="USD" /></div>
                 <div className="row gap-3" style={{ marginTop: 12 }}>
-                  <Delta value={42.7} />
+                  <Delta value={growthPct} />
                   <span className="muted" style={{ fontSize: 12.5 }}>12-month growth · </span>
-                  <span className="mono pos">+{$.fmt(totalGrowth)}</span>
+                  <span className={`mono ${totalGrowth >= 0 ? "pos" : "neg"}`}>{totalGrowth >= 0 ? "+" : ""}{$.fmt(totalGrowth)}</span>
                 </div>
               </div>
               <div className="row gap-2">

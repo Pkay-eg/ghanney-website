@@ -85,6 +85,7 @@ const Display = ({ value, from = "USD", currency, decimals = 0, blur = false }) 
 
 // ---------- Delta chip ----------
 const Delta = ({ value, suffix = "%", showSign = true }) => {
+  if (value == null || isNaN(value) || !isFinite(value)) return null;
   const pos = value >= 0;
   return (
     <span className={`chip ${pos ? "pos" : "neg"}`}>
@@ -271,5 +272,83 @@ const Status = ({ kind, label }) => {
   return <span className={`chip ${map[label] || ""}`}><span className={`dot ${map[label] || "muted"}`} />{label}</span>;
 };
 
+// ---------- MarketTape — live ticker tape ----------
+// Pulls from `window.tradingTickers` which is updated every 60s by
+// tickers.js (CoinGecko, Frankfurter, Yahoo). Subscribes to refreshes
+// so the tape re-renders without a parent re-mount.
+const MarketTape = ({ variant = "scroll", compact = false }) => {
+  const [, force] = React.useReducer((n) => n + 1, 0);
+  React.useEffect(() => {
+    if (window.tickers?.subscribe) return window.tickers.subscribe(force);
+  }, []);
+
+  const rows = window.tradingTickers || [];
+  const last = window.tickers?.snapshot?.().lastUpdated;
+  const empty = rows.length === 0;
+
+  const formatPrice = (v, dp) => {
+    const decimals = dp != null ? dp : (Math.abs(v) >= 1 ? 2 : 4);
+    return v.toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+  };
+
+  if (variant === "grid") {
+    return (
+      <div className="grid-3">
+        {empty ? (
+          <div className="muted" style={{ gridColumn: "span 3", fontSize: 12, padding: "8px 0" }}>
+            Fetching live market data…
+          </div>
+        ) : rows.slice(0, 6).map((t) => (
+          <div className="ticker" key={t.sym}>
+            <span className="sym">{t.sym}</span>
+            <span className="grow" />
+            <span className="price">{formatPrice(t.price, t.priceDp)}</span>
+            <span className={`delta ${t.delta >= 0 ? "pos" : "neg"}`}>
+              {t.delta >= 0 ? "+" : ""}{t.delta.toFixed(2)}%
+            </span>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  // scrolling / compact strip
+  const tapeRows = empty ? [] : rows.concat(rows);
+  return (
+    <div className="card tight" style={{ overflow: "hidden", padding: 0 }}>
+      <div className="row" style={{ overflowX: "auto" }}>
+        {empty ? (
+          <div className="muted" style={{ padding: compact ? "10px 18px" : "12px 20px", fontSize: 12 }}>
+            Fetching live market data…
+          </div>
+        ) : tapeRows.map((t, i) => (
+          <div
+            key={i}
+            className="row gap-2"
+            style={{
+              padding: compact ? "10px 18px" : "12px 20px",
+              borderRight: "1px solid var(--line-2)",
+              whiteSpace: "nowrap",
+            }}
+          >
+            <span className="mono" style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.04em" }}>{t.sym}</span>
+            <span className="mono" style={{ fontSize: compact ? 11 : 12 }}>{formatPrice(t.price, t.priceDp)}</span>
+            <span className={`mono ${t.delta >= 0 ? "pos" : "neg"}`} style={{ fontSize: 11 }}>
+              {compact ? (t.delta >= 0 ? "+" : "") : (t.delta >= 0 ? "▲ " : "▼ ")}
+              {compact ? t.delta.toFixed(2) : Math.abs(t.delta).toFixed(2)}%
+            </span>
+          </div>
+        ))}
+        {!empty && last && (
+          <div className="muted row" style={{ padding: compact ? "10px 18px" : "12px 20px", fontSize: 10, whiteSpace: "nowrap", marginLeft: "auto" }}>
+            <span className="dot pos" style={{ marginRight: 6 }} />
+            live · {last.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 // ---------- Make components globally available ----------
-Object.assign(window, { Icon, Display, Delta, Sparkline, AreaChart, StackedBars, Donut, Status });
+Object.assign(window, { Icon, Display, Delta, Sparkline, AreaChart, StackedBars, Donut, Status, MarketTape });

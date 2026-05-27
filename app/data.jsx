@@ -430,14 +430,22 @@ const activity = [
 ];
 
 // expose to window so all babel scripts share
+// (we DO NOT overwrite tradingTickers if tickers.js has already populated
+//  it with live data — see early-return below)
+const __seedTradingTickers = (window.tradingTickers && window.tradingTickers.length > 0)
+  ? window.tradingTickers
+  : tradingTickers;
 Object.assign(window, {
   fmt, usd, ghs, aed,
   incomeStreams, incomeMonthly,
   investments,
   netWorthMonthly, netWorthBreakdown,
   loans,
-  tradingPositions, tradingTickers, tradingPnL,
+  tradingPositions, tradingPnL,
   projects,
   upcoming,
   activity,
 });
+// Set tradingTickers separately, preferring any data tickers.js may have
+// already pushed during the babel transpile gap.
+window.tradingTickers = __seedTradingTickers;

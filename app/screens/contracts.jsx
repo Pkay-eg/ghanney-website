@@ -30,10 +30,10 @@ const ContractsScreen = ({ onNav, focused }) => {
       <Topbar title="Contracts" subtitle="Document vault" />
       <div className="content">
         <div className="grid-4" style={{ marginBottom: 24 }}>
-          <KPI eyebrow="Total contract value" value={$.fmtK(totalValueUsd)} sub={`Across ${contracts.length} documents`} />
-          <KPI eyebrow="Active" value={String(activeCount)} sub="In force right now" delta={null} />
-          <KPI eyebrow="Expiring · 90 days" value={String(expiringCount)} sub="Renew or terminate" delta={null} />
-          <KPI eyebrow="Pending / drafts" value={String(pendingCount)} sub="Need attention" delta={null} />
+          <KPI eyebrow="Total contract value" value={$.fmtK(totalValueUsd)} sub={contracts.length ? `Across ${contracts.length} document${contracts.length === 1 ? "" : "s"}` : "No contracts yet"} />
+          <KPI eyebrow="Active" value={String(activeCount)} sub={activeCount ? "In force right now" : "—"} delta={null} />
+          <KPI eyebrow="Expiring · 90 days" value={String(expiringCount)} sub={expiringCount ? "Renew or terminate" : "—"} delta={null} />
+          <KPI eyebrow="Pending / drafts" value={String(pendingCount)} sub={pendingCount ? "Need attention" : "—"} delta={null} />
         </div>
 
         <div className="row between" style={{ marginBottom: 16, gap: 14, flexWrap: "wrap" }}>

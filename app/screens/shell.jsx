@@ -4,14 +4,40 @@
 
 const NAV = [
   { id: "overview",   label: "Overview",    icon: "overview" },
-  { id: "income",     label: "Income",      icon: "income",   meta: "+$32.5K" },
-  { id: "investments",label: "Investments", icon: "invest",   meta: "7" },
-  { id: "trading",    label: "Trading",     icon: "trading",  meta: "+9.4%" },
-  { id: "loans",      label: "Loans",       icon: "loans",    meta: "6" },
-  { id: "projects",   label: "Projects",    icon: "projects", meta: "4" },
-  { id: "contracts",  label: "Contracts",   icon: "contract", meta: "16" },
+  { id: "income",     label: "Income",      icon: "income"   },
+  { id: "investments",label: "Investments", icon: "invest"   },
+  { id: "trading",    label: "Trading",     icon: "trading"  },
+  { id: "loans",      label: "Loans",       icon: "loans"    },
+  { id: "projects",   label: "Projects",    icon: "projects" },
+  { id: "contracts",  label: "Contracts",   icon: "contract" },
   { id: "networth",   label: "Net Worth",   icon: "networth" },
 ];
+
+// Compute the right-aligned meta badge for each nav item from the
+// currently loaded data. Returns "" (hidden) when there's nothing
+// meaningful to show — keeps the sidebar honest with empty portfolios.
+const navMeta = (id) => {
+  try {
+    if (id === "income") {
+      const ytd = (window.incomeMonthly || []).reduce((s, m) => s + (m.commission || 0) + (m.referral || 0), 0);
+      if (!ytd) return "";
+      return "+$" + (ytd >= 1000 ? (ytd / 1000).toFixed(1) + "K" : ytd.toFixed(0));
+    }
+    if (id === "investments") return (window.investments || []).length || "";
+    if (id === "loans")       return (window.loans || []).length || "";
+    if (id === "projects")    return (window.projects || []).length || "";
+    if (id === "contracts")   return (window.contracts || []).length || "";
+    if (id === "trading") {
+      const pos = window.tradingPositions || [];
+      const cost = pos.reduce((s, p) => s + p.qty * p.avg, 0);
+      const value = pos.reduce((s, p) => s + p.qty * p.last, 0);
+      if (!cost) return "";
+      const pct = ((value - cost) / cost) * 100;
+      return (pct >= 0 ? "+" : "") + pct.toFixed(1) + "%";
+    }
+  } catch (e) {}
+  return "";
+};
 
 const Sidebar = ({ active, onNav, mode }) => {
   return (
@@ -22,18 +48,21 @@ const Sidebar = ({ active, onNav, mode }) => {
       </div>
 
       <div className="nav-section">Portfolio</div>
-      {NAV.map((n) => (
-        <button
-          key={n.id}
-          className={`nav-item ${active === n.id ? "active" : ""}`}
-          onClick={() => onNav(n.id)}
-          title={n.label}
-        >
-          <span className="ic"><Icon name={n.icon} size={16} /></span>
-          <span>{n.label}</span>
-          {n.meta && <span className="meta">{n.meta}</span>}
-        </button>
-      ))}
+      {NAV.map((n) => {
+        const meta = navMeta(n.id);
+        return (
+          <button
+            key={n.id}
+            className={`nav-item ${active === n.id ? "active" : ""}`}
+            onClick={() => onNav(n.id)}
+            title={n.label}
+          >
+            <span className="ic"><Icon name={n.icon} size={16} /></span>
+            <span>{n.label}</span>
+            {meta !== "" && meta !== 0 && <span className="meta">{meta}</span>}
+          </button>
+        );
+      })}
 
       <div className="nav-section">Tools</div>
       <button className={`nav-item ${active === "team" ? "active" : ""}`} onClick={() => onNav("team")}>
@@ -103,7 +132,7 @@ const TopNav = ({ active, onNav }) => (
       <span className="kbd">⌘K</span>
     </div>
     <button className="btn icon" title="Notifications"><Icon name="bell" size={16} /></button>
-    <div className="avatar">KG</div>
+    <div className="avatar">{(window.__myInfo?.() || {}).initials || "U"}</div>
   </div>
 );
 

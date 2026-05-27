@@ -191,7 +191,7 @@ const LoginArt = () => {
             <div key={t.sym} className="row between">
               <span className="muted" style={{ fontSize: 12 }}>{t.sym}</span>
               <span className="mono" style={{ fontSize: 12 }}>
-                {t.price < 10 ? t.price.toFixed(4) : "$" + t.price.toLocaleString()} <span className={t.delta >= 0 ? "pos" : "neg"}>{t.delta >= 0 ? "+" : ""}{t.delta}%</span>
+                {t.price < 10 ? t.price.toFixed(4) : "$" + t.price.toLocaleString(undefined, { maximumFractionDigits: 2 })} <span className={t.delta >= 0 ? "pos" : "neg"}>{t.delta >= 0 ? "+" : ""}{(t.delta || 0).toFixed(2)}%</span>
               </span>
             </div>
           ))}

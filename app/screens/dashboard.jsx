@@ -25,27 +25,44 @@ const Dashboard = ({ layout = "executive", onNav, showSensitive = true }) => {
   return <DashboardExecutive onNav={onNav} showSensitive={showSensitive} />;
 };
 
+// Safe percentage change. Returns null when undefined (no base period yet).
+const pctChange = (curr, prev) => {
+  if (prev == null || prev === 0) return null;
+  return ((curr - prev) / prev) * 100;
+};
+
 // ---------- Executive — hero net worth + scannable grid ----------
 const DashboardExecutive = ({ onNav, showSensitive }) => {
   const $ = useMoney();
   const nwSeries = netWorthMonthly.map((d) => d.value);
-  const lastNW = nwSeries[nwSeries.length - 1];
-  const monthDelta = ((lastNW - nwSeries[nwSeries.length - 2]) / nwSeries[nwSeries.length - 2]) * 100;
-  const ytdDelta = ((lastNW - nwSeries[0]) / nwSeries[0]) * 100;
+  const lastNW = nwSeries[nwSeries.length - 1] || 0;
+  const monthDelta = pctChange(lastNW, nwSeries[nwSeries.length - 2]);
+  const ytdDelta = pctChange(lastNW, nwSeries[0]);
 
-  const ytdIncome = incomeMonthly.reduce((s, m) => s + m.commission + m.referral, 0); // USD
-  // accrued salaries summed in USD
+  const ytdIncome = incomeMonthly.reduce((s, m) => s + (m.commission || 0) + (m.referral || 0), 0);
+  const incomeLast3 = incomeMonthly.slice(-3).reduce((s, m) => s + (m.commission || 0) + (m.referral || 0), 0);
+  const incomePrev3 = incomeMonthly.slice(-6, -3).reduce((s, m) => s + (m.commission || 0) + (m.referral || 0), 0);
+  const incomeDelta = pctChange(incomeLast3, incomePrev3);
+
   const accruedSalariesUsd = incomeStreams
     .filter((s) => s.status === "Deferred")
     .reduce((s, x) => s + convertFx(x.accrued, x.currency, "USD"), 0);
+  // Synthesize a 12-point ramp ending at current accrual, for the spark
+  const accruedSpark = accruedSalariesUsd
+    ? Array.from({ length: 12 }, (_, i) => Math.round(accruedSalariesUsd * (i + 1) / 12))
+    : [];
 
   const totalLoansOut = loans.reduce((s, l) => s + convertFx(l.principal - l.paidBack, l.currency || "USD", "USD"), 0);
   const overdueLoans = loans.filter((l) => l.status === "Overdue" || l.status === "Due soon");
+  // Build a small synthetic outstanding-over-time series for the loan KPI sparkline
+  const loanSpark = loans.length
+    ? Array.from({ length: 7 }, (_, i) => totalLoansOut * (1 - (6 - i) * 0.005))
+    : [];
 
   const tradingValue = tradingPositions.reduce((s, p) => s + p.qty * p.last, 0);
   const tradingCost  = tradingPositions.reduce((s, p) => s + p.qty * p.avg, 0);
   const tradingPnLAbs = tradingValue - tradingCost;
-  const tradingPnLPct = (tradingPnLAbs / tradingCost) * 100;
+  const tradingPnLPct = tradingCost > 0 ? (tradingPnLAbs / tradingCost) * 100 : null;
 
   const realEstateValue = investments.filter((i) => (i.kind || "").includes("Real Estate")).reduce((s, i) => {
     return s + convertFx(i.valueNow, i.currency, "USD");
@@ -133,9 +150,9 @@ const DashboardExecutive = ({ onNav, showSensitive }) => {
             <KPI
               eyebrow="Income · YTD"
               value={$.fmtK(ytdIncome)}
-              sub={"Commissions + referrals · 12 mo"}
-              delta={18.4}
-              sparkData={incomeMonthly.map((m) => m.commission + m.referral)}
+              sub={ytdIncome ? "Commissions + referrals · 12 mo" : "No income recorded yet"}
+              delta={incomeDelta}
+              sparkData={ytdIncome ? incomeMonthly.map((m) => (m.commission || 0) + (m.referral || 0)) : null}
               sparkColor="var(--positive)"
             />
           </div>
@@ -143,19 +160,19 @@ const DashboardExecutive = ({ onNav, showSensitive }) => {
             <KPI
               eyebrow="Deferred Salaries"
               value={$.fmtK(accruedSalariesUsd)}
-              sub={"Ghana ₵ + Dubai Dh · accrued"}
+              sub={accruedSalariesUsd ? "Across deferred salary streams" : "No deferred salaries"}
               delta={null}
-              sparkData={[0, 20.5, 41, 61.5, 82, 102.5, 123, 143.5, 164, 184.5, 200, 213.5]}
+              sparkData={accruedSpark.length ? accruedSpark : null}
               sparkColor="var(--warn)"
             />
           </div>
           <div className="span-3">
             <KPI
               eyebrow="Trading P&L · MTD"
-              value={$.fmtK(tradingPnLAbs)}
-              sub={`+${tradingPnLPct.toFixed(2)}% unrealised`}
-              delta={tradingPnLPct > 0 ? 4.2 : -2.1}
-              sparkData={tradingPnL.map((p) => p.v)}
+              value={tradingCost ? $.fmtK(tradingPnLAbs) : "—"}
+              sub={tradingPnLPct == null ? "No positions yet" : `${tradingPnLPct >= 0 ? "+" : ""}${tradingPnLPct.toFixed(2)}% unrealised`}
+              delta={tradingPnLPct}
+              sparkData={tradingCost && tradingPnL?.length ? tradingPnL.map((p) => p.v) : null}
               sparkColor="var(--positive)"
             />
           </div>
@@ -163,9 +180,9 @@ const DashboardExecutive = ({ onNav, showSensitive }) => {
             <KPI
               eyebrow="Loans Outstanding"
               value={$.fmtK(totalLoansOut)}
-              sub={`${loans.length} active · ${overdueLoans.length} need attention`}
-              delta={-3.1}
-              sparkData={[122, 119, 118, 116, 115, 114, 112.5]}
+              sub={loans.length ? `${loans.length} active · ${overdueLoans.length} need attention` : "No loans on the books"}
+              delta={null}
+              sparkData={loanSpark.length ? loanSpark : null}
               sparkColor="var(--negative)"
             />
           </div>
@@ -247,24 +264,30 @@ const DashboardExecutive = ({ onNav, showSensitive }) => {
               </div>
 
               <div className="col">
-                {upcoming.map((u, i) => (
-                  <div key={i} className="row gap-3" style={{
-                    padding: "12px 0",
-                    borderBottom: i < upcoming.length - 1 ? "1px solid var(--line-2)" : "none",
-                  }}>
-                    <div className="col items-start" style={{ minWidth: 44 }}>
-                      <div className="mono" style={{ fontSize: 11, color: "var(--muted)" }}>{u.d.split(" ")[0]}</div>
-                      <div className="serif" style={{ fontSize: 20, lineHeight: 1 }}>{u.d.split(" ")[1]}</div>
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 12.5 }}>{u.who}</div>
-                      <div className="muted" style={{ fontSize: 11 }}>{u.k}{u.ccy && u.ccy !== $.display ? ` · ${formatCurrency(u.amt, u.ccy, { compact: true })}` : ""}</div>
-                    </div>
-                    <div className={`mono ${u.cls === "neg" ? "neg" : u.cls === "pos" ? "pos" : ""}`} style={{ fontSize: 12.5 }}>
-                      {u.cls === "neg" ? "−" : u.cls === "pos" ? "+" : ""}{$.fmtK(u.amt, u.ccy || "USD")}
-                    </div>
+                {upcoming.length === 0 ? (
+                  <div className="muted" style={{ fontSize: 12.5, padding: "20px 0" }}>
+                    Nothing scheduled. Loan & investment due dates appear here automatically.
                   </div>
-                ))}
+                ) : (
+                  upcoming.map((u, i) => (
+                    <div key={i} className="row gap-3" style={{
+                      padding: "12px 0",
+                      borderBottom: i < upcoming.length - 1 ? "1px solid var(--line-2)" : "none",
+                    }}>
+                      <div className="col items-start" style={{ minWidth: 44 }}>
+                        <div className="mono" style={{ fontSize: 11, color: "var(--muted)" }}>{u.d.split(" ")[0]}</div>
+                        <div className="serif" style={{ fontSize: 20, lineHeight: 1 }}>{u.d.split(" ")[1]}</div>
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 12.5 }}>{u.who}</div>
+                        <div className="muted" style={{ fontSize: 11 }}>{u.k}{u.ccy && u.ccy !== $.display ? ` · ${formatCurrency(u.amt, u.ccy, { compact: true })}` : ""}</div>
+                      </div>
+                      <div className={`mono ${u.cls === "neg" ? "neg" : u.cls === "pos" ? "pos" : ""}`} style={{ fontSize: 12.5 }}>
+                        {u.cls === "neg" ? "−" : u.cls === "pos" ? "+" : ""}{$.fmtK(u.amt, u.ccy || "USD")}
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
 
@@ -283,17 +306,15 @@ const DashboardExecutive = ({ onNav, showSensitive }) => {
               </button>
             </div>
 
-            <div className="grid-3" style={{ marginBottom: 18 }}>
-              {tradingTickers.slice(0, 6).map((t) => (
-                <div className="ticker" key={t.sym}>
-                  <span className="sym">{t.sym}</span>
-                  <span className="grow" />
-                  <span className="price">{t.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}</span>
-                  <span className={`delta ${t.delta >= 0 ? "pos" : "neg"}`}>{t.delta >= 0 ? "+" : ""}{t.delta.toFixed(2)}%</span>
-                </div>
-              ))}
+            <div style={{ marginBottom: 18 }}>
+              <MarketTape variant="grid" />
             </div>
 
+            {tradingPositions.length === 0 ? (
+              <div className="muted" style={{ padding: "32px 0", textAlign: "center", fontSize: 13 }}>
+                No open positions. <a style={{ cursor: "pointer", color: "var(--ink)" }} onClick={() => window.__openForm?.("trade")}>Record your first trade</a>.
+              </div>
+            ) : (
             <table className="table">
               <thead>
                 <tr><th>Position</th><th>Class</th><th className="num">Qty</th><th className="num">Avg</th><th className="num">Last</th><th className="num">P&L</th></tr>
@@ -301,7 +322,7 @@ const DashboardExecutive = ({ onNav, showSensitive }) => {
               <tbody>
                 {tradingPositions.slice(0, 5).map((p) => {
                   const pnl = (p.last - p.avg) * p.qty;
-                  const pct = ((p.last - p.avg) / p.avg) * 100;
+                  const pct = p.avg > 0 ? ((p.last - p.avg) / p.avg) * 100 : 0;
                   return (
                     <tr key={p.sym}>
                       <td>
@@ -326,6 +347,7 @@ const DashboardExecutive = ({ onNav, showSensitive }) => {
                 })}
               </tbody>
             </table>
+            )}
           </div>
 
           {/* Activity */}
@@ -338,24 +360,30 @@ const DashboardExecutive = ({ onNav, showSensitive }) => {
               <button className="btn ghost sm"><Icon name="refresh" size={14} /></button>
             </div>
             <div className="col">
-              {activity.map((a, i) => (
-                <div key={i} className="row gap-3" style={{
-                  padding: "12px 0",
-                  borderBottom: i < activity.length - 1 ? "1px solid var(--line-2)" : "none",
-                  alignItems: "flex-start",
-                }}>
-                  <span className="dot" style={{ marginTop: 6, background:
-                    a.tag === "loan" ? "var(--positive)" :
-                    a.tag === "trade" ? "var(--ink)" :
-                    a.tag === "real-estate" ? "var(--accent)" :
-                    a.tag === "income" ? "var(--positive)" :
-                    a.tag === "business" ? "var(--warn)" : "var(--muted)" }} />
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 12.5, lineHeight: 1.4 }}>{a.msg}</div>
-                    <div className="muted mono" style={{ fontSize: 10.5, marginTop: 3, textTransform: "uppercase", letterSpacing: "0.08em" }}>{a.t} · {a.tag}</div>
-                  </div>
+              {activity.length === 0 ? (
+                <div className="muted" style={{ fontSize: 12.5, padding: "20px 0" }}>
+                  No activity yet. Recording income, loans, or trades will show up here.
                 </div>
-              ))}
+              ) : (
+                activity.map((a, i) => (
+                  <div key={i} className="row gap-3" style={{
+                    padding: "12px 0",
+                    borderBottom: i < activity.length - 1 ? "1px solid var(--line-2)" : "none",
+                    alignItems: "flex-start",
+                  }}>
+                    <span className="dot" style={{ marginTop: 6, background:
+                      a.tag === "loan" ? "var(--positive)" :
+                      a.tag === "trade" ? "var(--ink)" :
+                      a.tag === "real-estate" ? "var(--accent)" :
+                      a.tag === "income" ? "var(--positive)" :
+                      a.tag === "business" ? "var(--warn)" : "var(--muted)" }} />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 12.5, lineHeight: 1.4 }}>{a.msg}</div>
+                      <div className="muted mono" style={{ fontSize: 10.5, marginTop: 3, textTransform: "uppercase", letterSpacing: "0.08em" }}>{a.t} · {a.tag}</div>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
 
@@ -431,23 +459,26 @@ const DashboardExecutive = ({ onNav, showSensitive }) => {
 const DashboardOperator = ({ onNav, showSensitive }) => {
   const $ = useMoney();
   const nwSeries = netWorthMonthly.map((d) => d.value);
-  const lastNW = nwSeries[nwSeries.length - 1];
+  const lastNW = nwSeries[nwSeries.length - 1] || 0;
+  const opMonthDelta = pctChange(lastNW, nwSeries[nwSeries.length - 2]);
+  const opYtdDelta = pctChange(lastNW, nwSeries[0]);
+
+  const opIncomeYtd = incomeMonthly.reduce((s, m) => s + (m.commission || 0) + (m.referral || 0), 0);
+  const opIncomeLast3 = incomeMonthly.slice(-3).reduce((s, m) => s + (m.commission || 0) + (m.referral || 0), 0);
+  const opIncomePrev3 = incomeMonthly.slice(-6, -3).reduce((s, m) => s + (m.commission || 0) + (m.referral || 0), 0);
+  const opIncomeDelta = pctChange(opIncomeLast3, opIncomePrev3);
+
+  const opTradingValue = tradingPositions.reduce((s, p) => s + p.qty * p.last, 0);
+  const opTradingCost = tradingPositions.reduce((s, p) => s + p.qty * p.avg, 0);
+  const opTradingDelta = opTradingCost > 0 ? ((opTradingValue - opTradingCost) / opTradingCost) * 100 : null;
 
   return (
     <div className="fade-in" data-screen-label="01 Overview (Operator)">
       <Topbar title="Operator view" subtitle="Personal Portal · Dense" />
       <div className="content">
         {/* tape across top */}
-        <div className="card tight" style={{ marginBottom: 16, overflow: "hidden", padding: 0 }}>
-          <div className="row" style={{ overflowX: "auto" }}>
-            {tradingTickers.concat(tradingTickers).map((t, i) => (
-              <div key={i} className="row gap-2" style={{ padding: "10px 18px", borderRight: "1px solid var(--line-2)", whiteSpace: "nowrap" }}>
-                <span className="mono" style={{ fontSize: 11, fontWeight: 600 }}>{t.sym}</span>
-                <span className="mono" style={{ fontSize: 11 }}>{t.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}</span>
-                <span className={`mono ${t.delta >= 0 ? "pos" : "neg"}`} style={{ fontSize: 11 }}>{t.delta >= 0 ? "+" : ""}{t.delta.toFixed(2)}%</span>
-              </div>
-            ))}
-          </div>
+        <div style={{ marginBottom: 16 }}>
+          <MarketTape compact />
         </div>
 
         <div className="grid-12">
@@ -456,37 +487,38 @@ const DashboardOperator = ({ onNav, showSensitive }) => {
             <div className="eyebrow">Net Worth</div>
             <div style={{ marginTop: 14 }}><Display value={lastNW} /></div>
             <div className="row gap-3" style={{ marginTop: 12 }}>
-              <Delta value={4.5} /><span className="muted" style={{ fontSize: 12 }}>this month</span>
+              <Delta value={opMonthDelta} />
+              <span className="muted" style={{ fontSize: 12 }}>this month</span>
             </div>
             <div className="hr" style={{ margin: "20px 0" }} />
-            {[
-              ["Real estate", 757000],
-              ["Sister JV", 168000],
-              ["SPV (gov)", 285000],
-              ["Trading", 248500],
-              ["Businesses", 62000],
-              ["Loans rec.", 112500],
-              ["Cash", 51500],
-            ].map(([k, v]) => (
-              <div key={k} className="row between" style={{ padding: "8px 0", borderBottom: "1px dashed var(--line-2)", fontSize: 12.5 }}>
-                <span className="muted">{k}</span>
-                <span className="mono">{$.fmtK(v)}</span>
+            {(netWorthBreakdown || []).length === 0 || (netWorthBreakdown[0]?.value || 0) === 0 ? (
+              <div className="muted" style={{ fontSize: 12, padding: "8px 0" }}>
+                Nothing tracked yet. Start with{" "}
+                <a style={{ cursor: "pointer", color: "var(--ink)" }} onClick={() => window.__openForm?.("investment")}>an investment</a>{" "}
+                or <a style={{ cursor: "pointer", color: "var(--ink)" }} onClick={() => window.__openForm?.("loan")}>a loan</a>.
               </div>
-            ))}
+            ) : (
+              netWorthBreakdown.map((b) => (
+                <div key={b.label} className="row between" style={{ padding: "8px 0", borderBottom: "1px dashed var(--line-2)", fontSize: 12.5 }}>
+                  <span className="muted">{b.label}</span>
+                  <span className="mono">{$.fmtK(b.value)}</span>
+                </div>
+              ))
+            )}
           </div>
 
           {/* Multi-chart column */}
           <div className="span-8">
             <div className="grid-2" style={{ gap: 16 }}>
               <div className="card">
-                <div className="row between"><div className="eyebrow">Net worth · 12mo</div><Delta value={42.7} /></div>
+                <div className="row between"><div className="eyebrow">Net worth · 12mo</div><Delta value={opYtdDelta} /></div>
                 <div style={{ marginTop: 8 }}>
                   <AreaChart data={netWorthMonthly} valueKey="value" color="var(--positive)" height={180}
                     formatY={(v) => $.fmtK(v)} formatTip={(v) => $.fmt(v)} />
                 </div>
               </div>
               <div className="card">
-                <div className="row between"><div className="eyebrow">Income · 12mo</div><Delta value={18.4} /></div>
+                <div className="row between"><div className="eyebrow">Income · 12mo</div><Delta value={opIncomeDelta} /></div>
                 <div style={{ marginTop: 8 }}>
                   <StackedBars
                     data={incomeMonthly} keys={["commission", "referral"]}
@@ -500,7 +532,7 @@ const DashboardOperator = ({ onNav, showSensitive }) => {
                 </div>
               </div>
               <div className="card">
-                <div className="row between"><div className="eyebrow">Trading P&L</div><Delta value={9.4} /></div>
+                <div className="row between"><div className="eyebrow">Trading P&L</div><Delta value={opTradingDelta} /></div>
                 <div style={{ marginTop: 8 }}>
                   <AreaChart data={tradingPnL} valueKey="v" color="var(--accent)" height={180}
                     formatY={(v) => $.fmtK(v)} formatTip={(v) => $.fmt(v)} />
@@ -558,8 +590,38 @@ const DashboardOperator = ({ onNav, showSensitive }) => {
 const DashboardCalm = ({ onNav, showSensitive }) => {
   const $ = useMoney();
   const nwSeries = netWorthMonthly.map((d) => d.value);
-  const lastNW = nwSeries[nwSeries.length - 1];
-  const monthDelta = nwSeries[nwSeries.length - 1] - nwSeries[nwSeries.length - 2];
+  const lastNW = nwSeries[nwSeries.length - 1] || 0;
+  const priorNW = nwSeries[nwSeries.length - 2] || 0;
+  const monthDelta = lastNW - priorNW;
+  const calmYtdIncome = incomeMonthly.reduce((s, m) => s + (m.commission || 0) + (m.referral || 0), 0);
+  const calmAccrued = incomeStreams
+    .filter((s) => s.status === "Deferred")
+    .reduce((s, x) => s + convertFx(x.accrued, x.currency, "USD"), 0);
+  // Build the "what needs attention" list from real loans + investments
+  const dueSoon = [];
+  loans.forEach((l) => {
+    if (l.status === "Overdue" || l.status === "Due soon") {
+      dueSoon.push({
+        kind: "Loan",
+        title: `${l.borrower} — ${l.status === "Overdue" ? "overdue" : "due " + l.nextPayment?.date}`,
+        amt: l.nextPayment?.amount || (l.principal - l.paidBack),
+        ccy: l.currency,
+        note: l.notes || (l.status === "Overdue" ? "Reach out today." : "Reminder this week."),
+        cls: l.status === "Overdue" ? "neg" : "warn",
+      });
+    }
+  });
+  investments.forEach((i) => {
+    if (i.nextPayment?.amount && i.nextPayment?.date && i.nextPayment.date !== "—") {
+      dueSoon.push({
+        kind: (i.kind || "").includes("Real Estate") ? "Off-plan" : "Investment",
+        title: `${i.name} — instalment`,
+        amt: i.nextPayment.amount, ccy: i.currency,
+        note: `Due ${i.nextPayment.date}.`, cls: "warn",
+      });
+    }
+  });
+  dueSoon.sort((a, b) => (a.cls === "neg" ? -1 : 1));
 
   return (
     <div className="fade-in" data-screen-label="01 Overview (Calm)">
@@ -573,8 +635,15 @@ const DashboardCalm = ({ onNav, showSensitive }) => {
             </span>
           </div>
           <div style={{ marginTop: 18, fontSize: 16, color: "var(--ink-2)", maxWidth: 620 }}>
-            Up <span className="pos">{$.fmtSign(monthDelta)} this month</span>, mostly from off-plan equity revaluation
-            and a strong run on NVDA. <span className="muted">Two loans need your attention this week.</span>
+            {lastNW > 0 ? (
+              <>
+                {monthDelta >= 0 ? "Up " : "Down "}
+                <span className={monthDelta >= 0 ? "pos" : "neg"}>{$.fmtSign(monthDelta)} this month</span>.{" "}
+                {dueSoon.length > 0 && <span className="muted">{dueSoon.length} item{dueSoon.length === 1 ? "" : "s"} need{dueSoon.length === 1 ? "s" : ""} your attention this week.</span>}
+              </>
+            ) : (
+              <span className="muted">Your portfolio is empty. Use <a style={{ cursor: "pointer", color: "var(--ink)" }} onClick={() => window.__openForm?.("investment")}>+ New</a> to record your first asset, loan, or income.</span>
+            )}
           </div>
         </div>
 
@@ -589,29 +658,30 @@ const DashboardCalm = ({ onNav, showSensitive }) => {
           <div className="eyebrow">This week</div>
           <h2 className="serif" style={{ fontSize: 32, margin: "8px 0 24px", letterSpacing: "-0.01em", fontWeight: 400 }}>What needs your attention.</h2>
 
-          {[
-            { kind: "Loan", title: "Naa Ayorkor — due June 1", amt: 6000, ccy: "USD", note: "Balloon repayment. Send a gentle reminder this week.", cls: "warn" },
-            { kind: "Loan", title: "Yaw Boateng — overdue", amt: 72500, ccy: "GHS", note: "Two days late. Reach out today.", cls: "neg" },
-            { kind: "Off-plan", title: "East Legon Hills — instalment", amt: 24500, ccy: "USD", note: "Due Jun 30. Cantonments and Bloom Tower follow shortly after.", cls: "warn" },
-            { kind: "SPV", title: "Eastern Corridor — Milestone 3 payment", amt: null, ccy: null, note: "Invoice in. Distribution expected Jul.", cls: "pos" },
-          ].map((it, i) => (
-            <div key={i} className="row gap-4" style={{ padding: "20px 0", borderTop: "1px solid var(--line)" }}>
-              <div className="tag" style={{ minWidth: 80 }}>{it.kind}</div>
-              <div style={{ flex: 1 }}>
-                <div className="serif" style={{ fontSize: 20, letterSpacing: "-0.01em" }}>
-                  {it.title}{it.amt != null && <span className="muted" style={{ fontSize: 16, marginLeft: 10, fontFamily: "var(--font-mono)" }}>{$.fmt(it.amt, it.ccy)}</span>}
+          {dueSoon.length === 0 ? (
+            <div className="muted" style={{ padding: "24px 0", fontSize: 14 }}>Nothing flagged. Add loans and investments to start seeing due dates here.</div>
+          ) : (
+            dueSoon.map((it, i) => (
+              <div key={i} className="row gap-4" style={{ padding: "20px 0", borderTop: "1px solid var(--line)" }}>
+                <div className="tag" style={{ minWidth: 80 }}>{it.kind}</div>
+                <div style={{ flex: 1 }}>
+                  <div className="serif" style={{ fontSize: 20, letterSpacing: "-0.01em" }}>
+                    {it.title}{it.amt != null && <span className="muted" style={{ fontSize: 16, marginLeft: 10, fontFamily: "var(--font-mono)" }}>{$.fmt(it.amt, it.ccy)}</span>}
+                  </div>
+                  <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>{it.note}</div>
                 </div>
-                <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>{it.note}</div>
+                <span className={`dot ${it.cls}`} />
               </div>
-              <span className={`dot ${it.cls}`} />
-            </div>
-          ))}
+            ))
+          )}
         </div>
 
         <div style={{ marginTop: 48 }}>
           <div className="eyebrow">Income, the past year</div>
           <h2 className="serif" style={{ fontSize: 32, margin: "8px 0 24px", letterSpacing: "-0.01em", fontWeight: 400 }}>
-            {$.fmt(225820)} in commissions and referrals — your salaries continue to accrue.
+            {calmYtdIncome > 0
+              ? <>{$.fmt(calmYtdIncome)} in commissions and referrals{calmAccrued > 0 ? " — your salaries continue to accrue." : "."}</>
+              : <span className="muted">No income recorded yet. Use Record income to start tracking.</span>}
           </h2>
           <div className="card" style={{ padding: 16 }}>
             <StackedBars
@@ -624,7 +694,7 @@ const DashboardCalm = ({ onNav, showSensitive }) => {
             <span><span className="dot" style={{ background: "var(--ink)", marginRight: 6 }} />Brokered commission</span>
             <span><span className="dot" style={{ background: "var(--warn)", marginRight: 6 }} />Referral fees</span>
             <span className="grow" />
-            <span className="muted">Two salaries deferred · {$.fmtK(213500)} accrued</span>
+            {calmAccrued > 0 && <span className="muted">Salaries deferred · {$.fmtK(calmAccrued)} accrued</span>}
           </div>
         </div>
       </div>

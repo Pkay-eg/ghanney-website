@@ -30,10 +30,10 @@ const LoansScreen = ({ onNav, focused }) => {
       <Topbar title="Loans receivable" subtitle="Borrowers" />
       <div className="content">
         <div className="grid-4" style={{ marginBottom: 24 }}>
-          <KPI eyebrow="Outstanding" value={$.fmtK(totalOutUsd)} sub={`Across ${loans.length} borrowers`} />
-          <KPI eyebrow="Total principal" value={$.fmtK(totalPrincipalUsd)} sub="Lifetime issued" />
-          <KPI eyebrow="Repaid to date" value={$.fmtK(totalRepaidUsd)} sub={`${Math.round((totalRepaidUsd/totalPrincipalUsd)*100)}% recovered`} delta={null} />
-          <KPI eyebrow="Weighted rate" value={(weightedRate * 100).toFixed(1) + "%"} sub="Blended APR (paid loans)" delta={null} />
+          <KPI eyebrow="Outstanding" value={$.fmtK(totalOutUsd)} sub={loans.length ? `Across ${loans.length} borrower${loans.length === 1 ? "" : "s"}` : "No loans on the books"} />
+          <KPI eyebrow="Total principal" value={$.fmtK(totalPrincipalUsd)} sub={totalPrincipalUsd > 0 ? "Lifetime issued" : "—"} />
+          <KPI eyebrow="Repaid to date" value={$.fmtK(totalRepaidUsd)} sub={totalPrincipalUsd > 0 ? `${Math.round((totalRepaidUsd/totalPrincipalUsd)*100)}% recovered` : "—"} delta={null} />
+          <KPI eyebrow="Weighted rate" value={isFinite(weightedRate) && weightedRate > 0 ? (weightedRate * 100).toFixed(1) + "%" : "—"} sub={isFinite(weightedRate) && weightedRate > 0 ? "Blended APR (paid loans)" : "—"} delta={null} />
         </div>
 
         <div className="row between" style={{ marginBottom: 16 }}>
