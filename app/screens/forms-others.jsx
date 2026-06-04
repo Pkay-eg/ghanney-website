@@ -6,6 +6,7 @@
 const LoanForm = ({ onClose }) => {
   const $ = useMoney();
   const [done, setDone] = React.useState(null);
+  const [repaymentTouched, setRepaymentTouched] = React.useState(false);
   const [form, setForm] = React.useState({
     borrower: "", type: "Individual",
     currency: "USD", principal: "",
@@ -25,6 +26,33 @@ const LoanForm = ({ onClose }) => {
     d.setMonth(d.getMonth() + parseInt(form.dueMonths || 0));
     return d.toISOString().slice(0, 10);
   })();
+
+  const termMonths = React.useMemo(() => {
+    if (form.dueMonths === 0 || form.dueMonths === "0") {
+      return window.paymentCalc?.termMonthsFromDates?.(form.issued, form.customDue) || null;
+    }
+    return parseInt(form.dueMonths, 10) || null;
+  }, [form.issued, form.dueMonths, form.customDue]);
+
+  const loanCalc = React.useMemo(() => {
+    if (!form.principal || !termMonths) return null;
+    return window.paymentCalc?.loanSchedule?.({
+      principal: form.principal,
+      annualRatePct: form.interest,
+      termMonths,
+      plan: form.repaymentPlan,
+    });
+  }, [form.principal, form.interest, form.repaymentPlan, termMonths]);
+
+  // Re-suggest payment when terms change (unless user typed their own amount).
+  React.useEffect(() => {
+    setRepaymentTouched(false);
+  }, [form.principal, form.interest, form.repaymentPlan, termMonths]);
+
+  React.useEffect(() => {
+    if (repaymentTouched || !loanCalc) return;
+    set("repaymentAmount", String(loanCalc.periodPayment));
+  }, [loanCalc, repaymentTouched]);
 
   const submit = async () => {
     if (!form.borrower || !form.principal) { window.__toast?.("Fill borrower + amount"); return; }
@@ -146,11 +174,32 @@ const LoanForm = ({ onClose }) => {
           />
         </Field>
 
-        <Field label="Expected payment amount" hint={form.repaymentPlan === "balloon" ? "Lump sum at maturity." : "Per period."}>
+        {loanCalc && (
+          <PaymentCalcCard
+            calc={loanCalc}
+            currency={form.currency}
+            appliedAmount={form.repaymentAmount}
+            onApply={(v) => {
+              set("repaymentAmount", v);
+              setRepaymentTouched(false);
+            }}
+          />
+        )}
+
+        {!loanCalc && form.principal && !termMonths && (
+          <div className="muted" style={{ fontSize: 12, marginBottom: 10 }}>
+            Set a term or custom due date to calculate expected payments.
+          </div>
+        )}
+
+        <Field label="Expected payment amount" hint={form.repaymentPlan === "balloon" ? "Lump sum at maturity." : "Per period — auto-filled from calculator above."}>
           <MoneyInput
             amount={form.repaymentAmount}
             currency={form.currency}
-            onAmountChange={(v) => set("repaymentAmount", v)}
+            onAmountChange={(v) => {
+              setRepaymentTouched(true);
+              set("repaymentAmount", v);
+            }}
             onCurrencyChange={(v) => set("currency", v)}
             currencies={[form.currency]}
           />
@@ -508,6 +557,7 @@ const IncomeForm = ({ onClose }) => {
 const PaymentForm = ({ onClose, defaultLoanId = null }) => {
   const $ = useMoney();
   const [done, setDone] = React.useState(null);
+  const [amountTouched, setAmountTouched] = React.useState(false);
   const [form, setForm] = React.useState({
     loanId: defaultLoanId || (window.loans[0]?.id || ""),
     amount: "",
@@ -517,6 +567,21 @@ const PaymentForm = ({ onClose, defaultLoanId = null }) => {
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
   const loan = window.loans.find((l) => l.id === form.loanId);
+
+  const repaymentCalc = React.useMemo(() => {
+    if (!loan) return null;
+    return window.paymentCalc?.suggestLoanRepayment?.(loan, form.date);
+  }, [loan, form.loanId, form.date]);
+
+  React.useEffect(() => {
+    setAmountTouched(false);
+  }, [form.loanId]);
+
+  React.useEffect(() => {
+    if (amountTouched) return;
+    if (repaymentCalc) set("amount", String(repaymentCalc.periodPayment));
+    else if (loan?.nextPayment?.amount) set("amount", String(loan.nextPayment.amount));
+  }, [repaymentCalc, amountTouched, loan]);
 
   const submit = async () => {
     if (!loan || !form.amount) { window.__toast?.("Pick a loan + amount"); return; }
@@ -589,12 +654,27 @@ const PaymentForm = ({ onClose, defaultLoanId = null }) => {
       </FormSection>
 
       <FormSection title="Payment">
+        {repaymentCalc && (
+          <PaymentCalcCard
+            calc={repaymentCalc}
+            currency={loan?.currency || "USD"}
+            title={repaymentCalc.note || "Suggested payment"}
+            appliedAmount={form.amount}
+            onApply={(v) => {
+              set("amount", v);
+              setAmountTouched(false);
+            }}
+          />
+        )}
         <div className="input-row">
-          <Field label="Amount received" required>
+          <Field label="Amount received" required hint={repaymentCalc ? "Auto-filled from remaining balance + rate." : ""}>
             <MoneyInput
               amount={form.amount}
               currency={loan?.currency || "USD"}
-              onAmountChange={(v) => set("amount", v)}
+              onAmountChange={(v) => {
+                setAmountTouched(true);
+                set("amount", v);
+              }}
               onCurrencyChange={() => {}}
               currencies={[loan?.currency || "USD"]}
             />

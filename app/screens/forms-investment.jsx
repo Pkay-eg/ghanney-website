@@ -33,7 +33,31 @@ const InvestmentForm = ({ onClose, onSubmit }) => {
     instalmentCount: 8,
     notes: "",
   });
+  const [instalmentTouched, setInstalmentTouched] = React.useState(false);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
+  const outstanding = React.useMemo(() => {
+    const total = parseFloat(form.priceTotal) || 0;
+    const paid = parseFloat(form.paid) || 0;
+    return Math.max(0, total - paid);
+  }, [form.priceTotal, form.paid]);
+
+  const instalmentCalc = React.useMemo(() => {
+    if (!outstanding || !form.instalmentCount) return null;
+    return window.paymentCalc?.splitInstalments?.({
+      outstanding,
+      count: form.instalmentCount,
+    });
+  }, [outstanding, form.instalmentCount]);
+
+  React.useEffect(() => {
+    setInstalmentTouched(false);
+  }, [form.priceTotal, form.paid, form.instalmentCount]);
+
+  React.useEffect(() => {
+    if (instalmentTouched || !instalmentCalc) return;
+    set("nextPaymentAmount", String(instalmentCalc.perInstalment));
+  }, [instalmentCalc, instalmentTouched]);
 
   // Reset secondary fields when mode flips
   React.useEffect(() => {
@@ -252,12 +276,33 @@ const InvestmentForm = ({ onClose, onSubmit }) => {
               </FormSection>
 
               <FormSection title="Next payment">
+                {instalmentCalc && (
+                  <PaymentCalcCard
+                    variant="instalment"
+                    title="Suggested instalment (outstanding ÷ count)"
+                    calc={instalmentCalc}
+                    currency={form.currency}
+                    appliedAmount={form.nextPaymentAmount}
+                    onApply={(v) => {
+                      set("nextPaymentAmount", v);
+                      setInstalmentTouched(false);
+                    }}
+                  />
+                )}
+                {form.priceTotal && outstanding <= 0 && (
+                  <div className="muted" style={{ fontSize: 12, marginBottom: 10 }}>
+                    Commitment is fully funded — no instalments to split.
+                  </div>
+                )}
                 <div className="input-row">
-                  <Field label="Amount" hint="Native currency of the asset.">
+                  <Field label="Amount" hint="Native currency of the asset — auto-filled when outstanding & instalments are set.">
                     <MoneyInput
                       amount={form.nextPaymentAmount}
                       currency={form.currency}
-                      onAmountChange={(v) => set("nextPaymentAmount", v)}
+                      onAmountChange={(v) => {
+                        setInstalmentTouched(true);
+                        set("nextPaymentAmount", v);
+                      }}
                       onCurrencyChange={(v) => set("currency", v)}
                       currencies={[form.currency]}
                     />

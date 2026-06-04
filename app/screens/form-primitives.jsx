@@ -214,6 +214,112 @@ const FormSection = ({ title, children }) => (
   </div>
 );
 
+// ---------- Payment calculator preview (loan / instalment flows) ----------
+const PaymentCalcCard = ({
+  calc,
+  currency = "USD",
+  title = "Calculated from your terms",
+  onApply,
+  appliedAmount,
+  variant = "loan", // "loan" | "instalment"
+}) => {
+  if (!calc) return null;
+  const fmt = (n) => formatCurrency(n, currency);
+  const isLoan = variant === "loan";
+  const suggested = isLoan ? calc.periodPayment : calc.perInstalment;
+  const isApplied =
+    appliedAmount != null &&
+    appliedAmount !== "" &&
+    Math.abs(parseFloat(appliedAmount) - suggested) < 0.02;
+
+  return (
+    <div
+      className="card"
+      style={{
+        padding: 14,
+        marginBottom: 12,
+        background: "var(--canvas)",
+        border: "1px dashed var(--line-2)",
+      }}
+    >
+      <div className="row between" style={{ marginBottom: 10, gap: 8, flexWrap: "wrap" }}>
+        <span className="eyebrow">{title}</span>
+        {onApply && (
+          <button
+            type="button"
+            className={`btn sm ${isApplied ? "" : "primary"}`}
+            onClick={() => onApply(String(suggested))}
+          >
+            {isApplied ? (
+              <>
+                <Icon name="check" size={12} /> Applied
+              </>
+            ) : (
+              <>Use {fmt(suggested)}</>
+            )}
+          </button>
+        )}
+      </div>
+
+      <div className="col gap-2" style={{ fontSize: 12.5 }}>
+        <div className="row between">
+          <span className="muted">{isLoan ? calc.periodLabel : "Per instalment"}</span>
+          <span className="mono" style={{ fontWeight: 500 }}>{fmt(suggested)}</span>
+        </div>
+        {isLoan && calc.plan !== "balloon" && (
+          <>
+            <div className="row between">
+              <span className="muted">Payments</span>
+              <span className="mono">{calc.paymentCount} × {fmt(calc.periodPayment)}</span>
+            </div>
+            <div className="row between">
+              <span className="muted">Total interest</span>
+              <span className="mono">{fmt(calc.totalInterest)}</span>
+            </div>
+            <div className="row between">
+              <span className="muted">Total repayment</span>
+              <span className="mono">{fmt(calc.totalRepayment)}</span>
+            </div>
+          </>
+        )}
+        {isLoan && calc.plan === "balloon" && (
+          <>
+            <div className="row between">
+              <span className="muted">Principal</span>
+              <span className="mono">{fmt(calc.principal)}</span>
+            </div>
+            <div className="row between">
+              <span className="muted">Interest to maturity</span>
+              <span className="mono">{fmt(calc.totalInterest)}</span>
+            </div>
+            <div className="row between">
+              <span className="muted">Due at maturity</span>
+              <span className="mono" style={{ fontWeight: 500 }}>{fmt(calc.totalRepayment)}</span>
+            </div>
+          </>
+        )}
+        {!isLoan && (
+          <>
+            <div className="row between">
+              <span className="muted">Outstanding balance</span>
+              <span className="mono">{fmt(calc.total)}</span>
+            </div>
+            <div className="row between">
+              <span className="muted">Instalments</span>
+              <span className="mono">{calc.count} equal payments</span>
+            </div>
+            {calc.lastInstalment !== calc.perInstalment && (
+              <div className="muted" style={{ fontSize: 11 }}>
+                Last instalment may be {fmt(calc.lastInstalment)} after rounding.
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
 // ---------- Mode pill ----------
 const ModePill = ({ value, onChange, options }) => (
   <div className="mode-pill">
@@ -431,6 +537,6 @@ const FileUpload = ({ files, onChange, accept = ".pdf,.doc,.docx,.png,.jpg,.jpeg
 
 Object.assign(window, {
   SidePanel, Field, Input, TextArea, Select, MoneyInput,
-  Segmented, Switch, Stepper, ChoiceGrid, FormSection, ModePill,
+  Segmented, Switch, Stepper, ChoiceGrid, FormSection, ModePill, PaymentCalcCard,
   SuccessCard, QuickAddMenu, FileUpload,
 });
