@@ -305,20 +305,28 @@ const ContractDetail = ({ contract: c, onBack, onNav }) => {
             ))}
           </div>
 
-          <div className="card span-4">
-            <div className="eyebrow" style={{ marginBottom: 14 }}>Counsel</div>
-            <div className="row gap-3" style={{ padding: "12px 0", borderBottom: "1px solid var(--line-2)" }}>
-              <div className="avatar">KA</div>
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 500 }}>Kwame Asante</div>
-                <div className="muted" style={{ fontSize: 11 }}>Asante Law Group · Lawyer</div>
+          {(() => {
+            // Counsel is whoever on your team holds the Lawyer role. No team
+            // lawyer → no card (rather than a made-up name).
+            const counsel = (window.team || []).find((m) => m.role === "Lawyer");
+            if (!counsel) return null;
+            return (
+              <div className="card span-4">
+                <div className="eyebrow" style={{ marginBottom: 14 }}>Counsel</div>
+                <div className="row gap-3" style={{ padding: "12px 0", borderBottom: "1px solid var(--line-2)" }}>
+                  <div className="avatar">{counsel.initials || (counsel.name || "?").split(/\s+/).map((s) => s[0]).slice(0, 2).join("").toUpperCase()}</div>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 500 }}>{counsel.name}</div>
+                    <div className="muted" style={{ fontSize: 11 }}>{[counsel.external, counsel.role].filter(Boolean).join(" · ")}</div>
+                  </div>
+                </div>
+                <div className="muted" style={{ fontSize: 11.5, lineHeight: 1.5, marginTop: 12 }}>
+                  {counsel.name.split(/\s+/)[0]} has access to this contract via the team portal.
+                </div>
+                <button className="btn sm" style={{ marginTop: 14, width: "100%" }}><Icon name="bell" size={12} />Notify counsel</button>
               </div>
-            </div>
-            <div className="muted" style={{ fontSize: 11.5, lineHeight: 1.5, marginTop: 12 }}>
-              Reviewed and approved by counsel. Kwame has access to this contract via the team portal.
-            </div>
-            <button className="btn sm" style={{ marginTop: 14, width: "100%" }}><Icon name="bell" size={12} />Notify counsel</button>
-          </div>
+            );
+          })()}
         </div>
       </div>
     </div>

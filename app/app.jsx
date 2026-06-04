@@ -11,6 +11,7 @@ const App = () => {
   const [showCmd, setShowCmd] = useState(false);
   const [openForm, setOpenForm] = useState(null);   // { type: "investment" | "loan" | ..., props?: {} }
   const [toast, setToast] = useState(null);
+  const [mobileNav, setMobileNav] = useState(false);
   const [, bumpRev] = React.useReducer((x) => x + 1, 0);
 
   // Expose form openers + state-bump + toast to all babel scripts
@@ -238,17 +239,32 @@ const App = () => {
   }
 
   const ShellWrap = ({ children }) => {
+    const closeNav = () => setMobileNav(false);
     if (t.nav === "topnav") {
       return (
         <div>
-          <TopNav active={route.page} onNav={(p) => nav(p)} />
+          <TopNav active={route.page} onNav={(p) => { nav(p); closeNav(); }} />
           <div>{children}</div>
         </div>
       );
     }
     return (
       <div className={`app ${t.nav === "rail" ? "nav-rail" : ""}`}>
-        <Sidebar active={route.page} onNav={(p) => nav(p)} mode={t.nav === "rail" ? "rail" : "full"} />
+        <button
+          className="mobile-nav-toggle"
+          aria-label={mobileNav ? "Close menu" : "Open menu"}
+          aria-expanded={mobileNav}
+          onClick={() => setMobileNav((s) => !s)}
+        >
+          <Icon name={mobileNav ? "x" : "menu"} size={18} />
+        </button>
+        <div className={`sidebar-scrim ${mobileNav ? "show" : ""}`} onClick={closeNav} />
+        <Sidebar
+          active={route.page}
+          onNav={(p) => { nav(p); closeNav(); }}
+          mode={t.nav === "rail" ? "rail" : "full"}
+          open={mobileNav}
+        />
         <div>{children}</div>
       </div>
     );

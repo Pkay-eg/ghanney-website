@@ -91,6 +91,73 @@ const Input = ({ value, onChange, placeholder, type = "text", error, autoFocus, 
   );
 };
 
+// ---------- BeneficiaryPicker ----------
+// A name input that doubles as a combobox over saved beneficiaries.
+// Type to create a new one, or pick an existing name to reuse its details.
+// `onPick(beneficiary)` fires when an existing entry is selected so the
+// parent form can auto-fill the rest of the transaction.
+const BeneficiaryPicker = ({ value, onChange, onPick, placeholder, autoFocus, error, filter }) => {
+  const [open, setOpen] = React.useState(false);
+  const all = React.useMemo(() => {
+    const l = (window.bens?.list?.() || []);
+    return filter ? l.filter(filter) : l;
+  }, [open, value]);
+
+  const q = (value || "").toLowerCase().trim();
+  const matches = q ? all.filter((b) => b.name.toLowerCase().includes(q)) : all;
+  const exactSaved = !!(value && window.bens?.find?.(value));
+  // Hide the menu once the typed value exactly matches the only suggestion.
+  const onlyExact = matches.length === 1 && matches[0].name.toLowerCase() === q;
+  const showMenu = open && matches.length > 0 && !onlyExact;
+
+  const initials = (n) =>
+    (n || "").trim().split(/\s+/).map((s) => s[0]).filter(Boolean).slice(0, 2).join("").toUpperCase() || "?";
+
+  const pick = (b) => {
+    onChange(b.name);
+    onPick?.(b);
+    setOpen(false);
+  };
+
+  return (
+    <div className="ben-field">
+      <Input
+        value={value}
+        onChange={(v) => { onChange(v); setOpen(true); }}
+        placeholder={placeholder}
+        autoFocus={autoFocus}
+        error={error}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 140)}
+        style={exactSaved ? { paddingRight: 86 } : undefined}
+      />
+      {exactSaved && !open && (
+        <span className="ben-badge"><Icon name="check" size={10} stroke={2.6} />Saved</span>
+      )}
+      {showMenu && (
+        <div className="ben-menu">
+          <div className="ben-menu-label">Saved beneficiaries · pick to reuse</div>
+          {matches.slice(0, 7).map((b) => (
+            <button
+              key={b.id}
+              type="button"
+              className="ben-opt"
+              onMouseDown={(e) => { e.preventDefault(); pick(b); }}
+            >
+              <span className="avatar sm">{initials(b.name)}</span>
+              <span className="col" style={{ minWidth: 0 }}>
+                <span className="ben-name">{b.name}</span>
+                <span className="ben-sub">{[b.type, b.location, b.org].filter(Boolean).join(" · ") || "Beneficiary"}</span>
+              </span>
+              {b.usedCount > 1 && <span className="tag">×{b.usedCount}</span>}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ---------- TextArea ----------
 const TextArea = ({ value, onChange, placeholder, rows = 3, error }) => (
   <textarea
@@ -536,7 +603,7 @@ const FileUpload = ({ files, onChange, accept = ".pdf,.doc,.docx,.png,.jpg,.jpeg
 };
 
 Object.assign(window, {
-  SidePanel, Field, Input, TextArea, Select, MoneyInput,
+  SidePanel, Field, Input, BeneficiaryPicker, TextArea, Select, MoneyInput,
   Segmented, Switch, Stepper, ChoiceGrid, FormSection, ModePill, PaymentCalcCard,
   SuccessCard, QuickAddMenu, FileUpload,
 });
