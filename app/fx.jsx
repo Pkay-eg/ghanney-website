@@ -177,9 +177,22 @@ const CurrencySwitch = ({ size = "md" }) => {
   );
 };
 
+// Friendly "x ago" from an ISO timestamp.
+const fxAgo = (iso) => {
+  if (!iso) return null;
+  const s = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 1000));
+  if (s < 5) return "just now";
+  if (s < 60) return s + "s ago";
+  const m = Math.floor(s / 60);
+  if (m < 60) return m + "m ago";
+  const h = Math.floor(m / 60);
+  return h + "h ago";
+};
+
 // ---------- FX Rates widget ----------
 const FxRatesWidget = ({ compact = false }) => {
   const display = React.useContext(window.CurrencyContext);
+  const live = window.__fxLive || {};
 
   // Quote as "1 <display> = N <other>" (e.g. 1 USD = 14.50 GHS). This is
   // the natural way locals think about rates ("how many cedis does $1 buy?")
@@ -209,7 +222,7 @@ const FxRatesWidget = ({ compact = false }) => {
             <div className="h-section" style={{ marginTop: 4 }}>vs {display}</div>
           </div>
           <div className="row gap-2" style={{ fontSize: 11, color: "var(--muted)" }}>
-            <span className="dot pos" /> Live · mid-market
+            <span className={`dot ${live.ok ? "pos" : "warn"}`} /> {live.ok ? `Live · ${live.source || "FX"}` : "Connecting…"}
           </div>
         </div>
       )}
@@ -239,8 +252,8 @@ const FxRatesWidget = ({ compact = false }) => {
         <>
           <div className="hr" style={{ margin: "14px 0" }} />
           <div className="row between" style={{ fontSize: 11, color: "var(--muted)" }}>
-            <span>Updated</span>
-            <span className="mono">{FX_UPDATED}</span>
+            <span>{live.source ? `Updated via ${live.source}` : "Updated"}</span>
+            <span className="mono">{live.lastUpdated ? fxAgo(live.lastUpdated) : FX_UPDATED}</span>
           </div>
         </>
       )}

@@ -66,11 +66,57 @@ const PeriodTabs = ({ periods, value, onChange }) => (
   </div>
 );
 
+// First-run guide — shown on the dashboard while the portfolio is empty.
+const GetStarted = () => {
+  const steps = [
+    { done: (window.investments || []).length > 0, label: "Add your first investment", desc: "Property, business equity or an SPV", icon: "invest", type: "investment" },
+    { done: (window.loans || []).length > 0, label: "Record a loan you've given", desc: "Track repayments and due dates", icon: "loans", type: "loan" },
+    { done: (window.incomeRecords || []).length > 0, label: "Log income received", desc: "Commissions, referrals, distributions", icon: "income", type: "income" },
+    { done: (window.integrations || []).length > 0, label: "Connect a trading account", desc: "Binance, Kraken, Coinbase, IBKR…", icon: "link", type: "integration" },
+  ];
+  const doneCount = steps.filter((s) => s.done).length;
+  return (
+    <div className="card pad-lg span-12" style={{ background: "var(--surface)" }}>
+      <div className="row between" style={{ alignItems: "flex-start", flexWrap: "wrap", gap: 12 }}>
+        <div>
+          <div className="eyebrow">Get started</div>
+          <div className="h-section" style={{ marginTop: 6 }}>Build your portfolio</div>
+          <div className="muted" style={{ fontSize: 13, marginTop: 6, maxWidth: 460 }}>
+            Your portal is empty. Add what you own and owe — everything else (net worth, notifications, charts) fills in automatically.
+          </div>
+        </div>
+        <div className="muted mono" style={{ fontSize: 12 }}>{doneCount} / {steps.length} done</div>
+      </div>
+      <div className="grid-2" style={{ gap: 12, marginTop: 18 }}>
+        {steps.map((s) => (
+          <button
+            key={s.type}
+            className="card flat"
+            onClick={() => window.__openForm?.(s.type)}
+            style={{ display: "flex", alignItems: "center", gap: 12, textAlign: "left", padding: 14, cursor: "pointer" }}
+          >
+            <span className="notif-ic" style={{ flexShrink: 0, background: s.done ? "var(--positive-soft)" : "var(--line-2)", color: s.done ? "var(--positive)" : "var(--ink-2)" }}>
+              <Icon name={s.done ? "check" : s.icon} size={15} stroke={s.done ? 2.6 : 1.6} />
+            </span>
+            <span className="col" style={{ minWidth: 0, flex: 1 }}>
+              <span style={{ fontSize: 13.5, fontWeight: 500, textDecoration: s.done ? "line-through" : "none", opacity: s.done ? 0.6 : 1 }}>{s.label}</span>
+              <span className="muted" style={{ fontSize: 11.5 }}>{s.desc}</span>
+            </span>
+            {!s.done && <Icon name="arrowRight" size={14} />}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 // ---------- Executive — hero net worth + scannable grid ----------
 const DashboardExecutive = ({ onNav, showSensitive }) => {
   const $ = useMoney();
   const [nwPeriod, setNwPeriod] = React.useState("1Y");
+  const [compMode, setCompMode] = React.useState("value"); // "value" | "pct"
   const nwChartData = sliceSeriesByPeriod(netWorthMonthly, nwPeriod);
+  const compTotal = netWorthBreakdown.reduce((s, d) => s + (d.value || 0), 0) || 1;
   const nwSeries = netWorthMonthly.map((d) => d.value);
   const lastNW = nwSeries[nwSeries.length - 1] || 0;
   const monthDelta = pctChange(lastNW, nwSeries[nwSeries.length - 2]);
@@ -110,6 +156,11 @@ const DashboardExecutive = ({ onNav, showSensitive }) => {
       <Topbar title={`Welcome back, ${(window.__myInfo?.() || {}).first || "there"}.`} subtitle={`${new Date().toLocaleDateString("en-GB",{weekday:"long"})} · ${new Date().toLocaleDateString("en-GB",{day:"2-digit",month:"long",year:"numeric"})}`} />
 
       <div className="content">
+        {(investments || []).length === 0 && (loans || []).length === 0 && (tradingPositions || []).length === 0 && (netWorthBreakdown || []).length === 0 && (
+          <div className="grid-12" style={{ marginBottom: 20 }}>
+            <GetStarted />
+          </div>
+        )}
         {/* Hero net worth */}
         <div className="grid-12">
           <div className="card pad-lg span-8" style={{ position: "relative", overflow: "hidden" }}>
@@ -151,7 +202,9 @@ const DashboardExecutive = ({ onNav, showSensitive }) => {
           <div className="card pad-lg span-4">
             <div className="row between">
               <div className="eyebrow">Composition</div>
-              <button className="btn ghost sm">By value</button>
+              <button className="btn ghost sm" onClick={() => setCompMode((m) => (m === "value" ? "pct" : "value"))}>
+                {compMode === "value" ? "By value" : "By %"}
+              </button>
             </div>
             <div className="row gap-4" style={{ marginTop: 18, alignItems: "center" }}>
               <Donut data={netWorthBreakdown} size={160} thickness={20} />
@@ -162,7 +215,7 @@ const DashboardExecutive = ({ onNav, showSensitive }) => {
                       <span style={{ width: 8, height: 8, borderRadius: 2, background: d.color, flexShrink: 0 }} />
                       <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 110 }}>{d.label.split(" (")[0]}</span>
                     </span>
-                    <span className="mono" style={{ whiteSpace: "nowrap", flexShrink: 0 }}>{$.fmtK(d.value)}</span>
+                    <span className="mono" style={{ whiteSpace: "nowrap", flexShrink: 0 }}>{compMode === "value" ? $.fmtK(d.value) : `${Math.round((d.value / compTotal) * 100)}%`}</span>
                   </div>
                 ))}
               </div>
@@ -585,9 +638,8 @@ const DashboardOperator = ({ onNav, showSensitive }) => {
             <div className="row between" style={{ marginBottom: 12 }}>
               <div className="h-section">All positions</div>
               <div className="row gap-2">
-                <button className="btn sm"><Icon name="filter" size={12} />Filter</button>
-                <button className="btn sm"><Icon name="sort" size={12} />Sort</button>
-                <button className="btn sm"><Icon name="download" size={12} />Export</button>
+                <button className="btn sm" onClick={() => onNav?.("investments")}><Icon name="filter" size={12} />Filter & sort</button>
+                <button className="btn sm" onClick={() => window.__export?.("investments")}><Icon name="download" size={12} />Export</button>
               </div>
             </div>
             <table className="table">

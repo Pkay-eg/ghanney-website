@@ -94,6 +94,16 @@ input {
 
 a { color: inherit; text-decoration: none; }
 
+/* Keyboard focus visibility — only shows for keyboard users, not mouse clicks */
+:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+/* Inputs/textions already render their own focus ring (box-shadow) */
+.input:focus-visible, .textarea:focus-visible, .search input:focus-visible,
+.field input:focus-visible, .money-input .amount:focus-visible { outline: none; }
+
 /* ------------------------------------------------------------
    Typographic helpers
    ------------------------------------------------------------ */
@@ -236,6 +246,20 @@ a { color: inherit; text-decoration: none; }
 .btn.ghost:hover { background: var(--line-2); color: var(--ink); }
 .btn.sm { height: 28px; padding: 0 10px; font-size: 12px; border-radius: 6px; }
 .btn.icon { width: 36px; padding: 0; }
+.btn:disabled { opacity: 0.6; cursor: default; pointer-events: none; }
+
+/* Inline spinner for async buttons */
+.spinner {
+  width: 13px;
+  height: 13px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  display: inline-block;
+  animation: spin 0.6s linear infinite;
+  opacity: 0.85;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
 
 /* ------------------------------------------------------------
    Layout primitives

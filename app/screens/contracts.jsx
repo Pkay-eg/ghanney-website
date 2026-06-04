@@ -3,6 +3,18 @@
 // (constants CONTRACT_TYPES / STATUS_CHIP / daysUntil live in data-extras.jsx)
 // =========================================================
 
+// Open a contract's stored PDF via a short-lived signed URL.
+const openContractFile = async (c) => {
+  if (!c?.filePath) { window.__toast?.("No file attached to this contract yet."); return; }
+  try {
+    const url = await window.db?.downloadFile?.(c.filePath);
+    if (url) window.open(url, "_blank", "noopener");
+    else window.__toast?.("Could not open the file.");
+  } catch (e) {
+    window.__toast?.(e?.message || "Could not open the file.");
+  }
+};
+
 const ContractsScreen = ({ onNav, focused }) => {
   const $ = useMoney();
   const [filter, setFilter] = React.useState("All");
@@ -44,7 +56,7 @@ const ContractsScreen = ({ onNav, focused }) => {
           </div>
           <div className="row gap-2">
             <button className="btn sm"><Icon name="filter" size={12} />Type</button>
-            <button className="btn sm"><Icon name="download" size={12} />Export</button>
+            <button className="btn sm" onClick={() => window.__export?.("contracts")}><Icon name="download" size={12} />Export</button>
             <button className="btn sm primary" onClick={() => window.__openForm?.("contract")}><Icon name="plus" size={12} />Add contract</button>
           </div>
         </div>
@@ -280,9 +292,9 @@ const ContractDetail = ({ contract: c, onBack, onNav }) => {
             </div>
 
             <div className="col gap-2" style={{ marginTop: 14 }}>
-              <button className="btn primary"><Icon name="download" size={14} />Download PDF</button>
-              <button className="btn"><Icon name="eye" size={14} />Preview full</button>
-              <button className="btn"><Icon name="plus" size={14} />Upload new version</button>
+              <button className="btn primary" onClick={() => openContractFile(c)}><Icon name="download" size={14} />Download PDF</button>
+              <button className="btn" onClick={() => openContractFile(c)}><Icon name="eye" size={14} />Preview full</button>
+              <button className="btn" onClick={() => window.__openForm?.("contract")}><Icon name="plus" size={14} />Upload new version</button>
             </div>
           </div>
 
@@ -323,7 +335,7 @@ const ContractDetail = ({ contract: c, onBack, onNav }) => {
                 <div className="muted" style={{ fontSize: 11.5, lineHeight: 1.5, marginTop: 12 }}>
                   {counsel.name.split(/\s+/)[0]} has access to this contract via the team portal.
                 </div>
-                <button className="btn sm" style={{ marginTop: 14, width: "100%" }}><Icon name="bell" size={12} />Notify counsel</button>
+                <button className="btn sm" style={{ marginTop: 14, width: "100%" }} onClick={() => window.__toast?.(`Counsel notifications are coming soon — ${counsel.name.split(/\s+/)[0]} has portal access in the meantime.`)}><Icon name="bell" size={12} />Notify counsel</button>
               </div>
             );
           })()}

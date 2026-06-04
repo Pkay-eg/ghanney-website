@@ -69,12 +69,12 @@ const ContractForm = ({ onClose, defaultLinkedTo = null }) => {
     try {
       setUploading(true);
       if (window.db?.isConfigured?.()) {
-        const path = await window.db.contracts.uploadFile(f, `${Date.now()}-${f.name}`);
+        const path = await window.db.contracts.uploadFile(f.file || f, `${Date.now()}-${f.name}`);
         ct.filePath = path;
         const saved = await window.db.contracts.create(ct);
         // Also upload additional attachments
         for (let i = 1; i < files.length; i++) {
-          try { await window.db.contracts.uploadFile(files[i], `${Date.now()}-${i}-${files[i].name}`); } catch (e) {}
+          try { await window.db.contracts.uploadFile(files[i].file || files[i], `${Date.now()}-${i}-${files[i].name}`); } catch (e) {}
         }
         setDone(saved);
       } else {
@@ -273,7 +273,7 @@ const SiteUpdateForm = ({ onClose, defaultInvestmentId = null }) => {
       footer={
         <>
           <button className="btn ghost" onClick={onClose}>Cancel</button>
-          <button className="btn primary" onClick={submit}><Icon name="plus" size={12} />Save update</button>
+          <SubmitButton onSubmit={submit}><Icon name="plus" size={12} />Save update</SubmitButton>
         </>
       }
     >
@@ -435,10 +435,10 @@ const TeamInviteForm = ({ onClose, defaultMember = null }) => {
       footer={
         <>
           <button className="btn ghost" onClick={onClose}>Cancel</button>
-          <button className="btn primary" onClick={submit}>
+          <SubmitButton onSubmit={submit}>
             <Icon name={editing ? "check" : "plus"} size={12} stroke={editing ? 2.4 : undefined} />
             {editing ? "Save changes" : "Send invitation"}
-          </button>
+          </SubmitButton>
         </>
       }
     >
@@ -626,7 +626,7 @@ const InvestmentPaymentForm = ({ onClose, defaultInvestmentId = null, defaultAmo
       footer={
         <>
           <button className="btn ghost" onClick={onClose}>Cancel</button>
-          <button className="btn primary" onClick={submit}><Icon name="plus" size={12} />Add payment</button>
+          <SubmitButton onSubmit={submit}><Icon name="plus" size={12} />Add payment</SubmitButton>
         </>
       }
     >

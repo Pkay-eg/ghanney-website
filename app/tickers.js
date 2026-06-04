@@ -97,6 +97,21 @@
         window.FX_RATES_PREV[t.ref] = p;
       }
     });
+
+    // Frankfurter (ECB) doesn't quote GHS or AED — fill any missing FX tape
+    // rows from the live FX engine (fx-live.js → window.FX_RATES) so the tape
+    // stays complete for the app's actual currencies.
+    TARGETS.filter((t) => t.source === "frankfurter").forEach((t) => {
+      if (state.cache.has(t.sym)) return;
+      const live = window.FX_RATES && window.FX_RATES[t.ref];
+      if (!live) return;
+      const prev = window.FX_RATES_PREV && window.FX_RATES_PREV[t.ref];
+      state.cache.set(t.sym, {
+        price: live,
+        delta: prev ? ((live - prev) / prev) * 100 : 0,
+        priceDp: t.priceDp,
+      });
+    });
   }
 
   async function loadYahoo() {

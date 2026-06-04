@@ -106,7 +106,7 @@ const LoanForm = ({ onClose }) => {
       footer={
         <>
           <button className="btn ghost" onClick={onClose}>Cancel</button>
-          <button className="btn primary" onClick={submit}><Icon name="plus" size={12} />Record loan</button>
+          <SubmitButton onSubmit={submit}><Icon name="plus" size={12} />Record loan</SubmitButton>
         </>
       }
     >
@@ -307,9 +307,9 @@ const TradeForm = ({ onClose, defaultAction = "Buy" }) => {
       footer={
         <>
           <button className="btn ghost" onClick={onClose}>Cancel</button>
-          <button className={`btn ${form.action === "Buy" ? "primary" : ""}`} onClick={submit} style={form.action === "Sell" ? { background: "var(--negative)", color: "var(--surface)", borderColor: "var(--negative)" } : null}>
+          <SubmitButton onSubmit={submit} className={`btn ${form.action === "Buy" ? "primary" : ""}`} style={form.action === "Sell" ? { background: "var(--negative)", color: "var(--surface)", borderColor: "var(--negative)" } : null}>
             {form.action === "Buy" ? "Place buy" : "Place sell"}
-          </button>
+          </SubmitButton>
         </>
       }
     >
@@ -432,7 +432,7 @@ const ProjectForm = ({ onClose }) => {
       footer={
         <>
           <button className="btn ghost" onClick={onClose}>Cancel</button>
-          <button className="btn primary" onClick={submit}><Icon name="plus" size={12} />Create project</button>
+          <SubmitButton onSubmit={submit}><Icon name="plus" size={12} />Create project</SubmitButton>
         </>
       }
     >
@@ -524,7 +524,7 @@ const IncomeForm = ({ onClose }) => {
       footer={
         <>
           <button className="btn ghost" onClick={onClose}>Cancel</button>
-          <button className="btn primary" onClick={submit}><Icon name="plus" size={12} />Record income</button>
+          <SubmitButton onSubmit={submit}><Icon name="plus" size={12} />Record income</SubmitButton>
         </>
       }
     >
@@ -634,7 +634,7 @@ const PaymentForm = ({ onClose, defaultLoanId = null }) => {
       footer={
         <>
           <button className="btn ghost" onClick={onClose}>Cancel</button>
-          <button className="btn primary" onClick={submit}><Icon name="check" size={12} stroke={2.4} />Record payment</button>
+          <SubmitButton onSubmit={submit}><Icon name="check" size={12} stroke={2.4} />Record payment</SubmitButton>
         </>
       }
     >

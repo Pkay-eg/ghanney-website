@@ -236,6 +236,23 @@ const Segmented = ({ value, onChange, options, cols }) => (
   </div>
 );
 
+// ---------- SubmitButton — async-aware primary action ----------
+// Disables itself + shows a spinner while onSubmit is in flight, so a slow
+// save can't be double-clicked into duplicate records.
+const SubmitButton = ({ onSubmit, children, className = "btn primary", savingLabel = "Saving…", style }) => {
+  const [saving, setSaving] = React.useState(false);
+  const handle = async () => {
+    if (saving) return;
+    setSaving(true);
+    try { await onSubmit(); } finally { setSaving(false); }
+  };
+  return (
+    <button type="button" className={className} disabled={saving} aria-busy={saving} onClick={handle} style={style}>
+      {saving ? <><span className="spinner" aria-hidden="true" />{savingLabel}</> : children}
+    </button>
+  );
+};
+
 // ---------- Switch / Toggle ----------
 const Switch = ({ value, onChange }) => (
   <button type="button" className={`switch ${value ? "on" : ""}`} onClick={() => onChange(!value)} role="switch" aria-checked={value}>
@@ -514,18 +531,26 @@ const QuickAddMenu = ({ open, onClose, onPick }) => {
   );
 };
 
-// ---------- File upload (mock) ----------
-const FileUpload = ({ files, onChange, accept = ".pdf,.doc,.docx,.png,.jpg,.jpeg", multiple = false, hint }) => {
+// ---------- File upload ----------
+// Keeps the real File object (under `.file`) so forms can upload the bytes,
+// and rejects anything over the size limit.
+const FileUpload = ({ files, onChange, accept = ".pdf,.doc,.docx,.png,.jpg,.jpeg", multiple = false, hint, maxMB = 20 }) => {
   const inputRef = React.useRef(null);
   const [dragOver, setDragOver] = React.useState(false);
 
   const addFiles = (fileList) => {
     if (!fileList || fileList.length === 0) return;
-    const meta = Array.from(fileList).map((f) => ({
+    const all = Array.from(fileList);
+    const tooBig = all.filter((f) => f.size > maxMB * 1024 * 1024);
+    const ok = all.filter((f) => f.size <= maxMB * 1024 * 1024);
+    if (tooBig.length) window.__toast?.(`${tooBig.length} file${tooBig.length > 1 ? "s" : ""} over ${maxMB}MB skipped`);
+    const meta = ok.map((f) => ({
       name: f.name,
       size: f.size,
       type: f.type,
       addedAt: new Date().toISOString(),
+      file: f, // the real File — used by the form to upload the bytes
+      preview: f.type.startsWith("image/") ? URL.createObjectURL(f) : null,
     }));
     onChange(multiple ? [...(files || []), ...meta] : meta);
   };
@@ -580,16 +605,20 @@ const FileUpload = ({ files, onChange, accept = ".pdf,.doc,.docx,.png,.jpg,.jpeg
               border: "1px solid var(--line)",
               borderRadius: 8,
             }}>
-              <div style={{
-                width: 28, height: 34, borderRadius: 3,
-                background: "var(--canvas)", border: "1px solid var(--line-2)",
-                display: "flex", alignItems: "flex-end", justifyContent: "center",
-                padding: "2px 1px", flexShrink: 0,
-                fontFamily: "var(--font-mono)", fontSize: 8, color: "var(--muted)",
-                fontWeight: 600,
-              }}>
-                {(f.name.split(".").pop() || "").toUpperCase().slice(0, 3)}
-              </div>
+              {f.preview ? (
+                <img src={f.preview} alt={f.name} style={{ width: 34, height: 34, borderRadius: 4, objectFit: "cover", flexShrink: 0, border: "1px solid var(--line-2)" }} />
+              ) : (
+                <div style={{
+                  width: 28, height: 34, borderRadius: 3,
+                  background: "var(--canvas)", border: "1px solid var(--line-2)",
+                  display: "flex", alignItems: "flex-end", justifyContent: "center",
+                  padding: "2px 1px", flexShrink: 0,
+                  fontFamily: "var(--font-mono)", fontSize: 8, color: "var(--muted)",
+                  fontWeight: 600,
+                }}>
+                  {(f.name.split(".").pop() || "").toUpperCase().slice(0, 3)}
+                </div>
+              )}
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{f.name}</div>
                 <div className="muted mono" style={{ fontSize: 10.5 }}>{fmt(f.size)} · added now</div>
@@ -612,5 +641,5 @@ const FileUpload = ({ files, onChange, accept = ".pdf,.doc,.docx,.png,.jpg,.jpeg
 Object.assign(window, {
   SidePanel, Field, Input, BeneficiaryPicker, TextArea, Select, MoneyInput,
   Segmented, Switch, Stepper, ChoiceGrid, FormSection, ModePill, PaymentCalcCard,
-  SuccessCard, QuickAddMenu, FileUpload,
+  SuccessCard, QuickAddMenu, FileUpload, SubmitButton,
 });

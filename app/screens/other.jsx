@@ -41,7 +41,7 @@ const IncomeScreen = () => {
               <div className="row gap-2">
                 <button className="btn sm">USD</button>
                 <button className="btn sm">Monthly</button>
-                <button className="btn sm"><Icon name="download" size={12} />Export</button>
+                <button className="btn sm" onClick={() => window.__export?.("income")}><Icon name="download" size={12} />Export</button>
               </div>
             </div>
             <StackedBars
@@ -137,7 +137,7 @@ const IncomeScreen = () => {
               <div className="h-section">Recent transactions</div>
               <div className="row gap-2">
                 <button className="btn sm"><Icon name="filter" size={12} />Filter</button>
-                <button className="btn sm"><Icon name="download" size={12} />Export</button>
+                <button className="btn sm" onClick={() => window.__export?.("income")}><Icon name="download" size={12} />Export</button>
               </div>
             </div>
             {(() => {
@@ -195,7 +195,6 @@ const ProjectsScreen = () => {
             <div key={p.id} className="card pad-lg">
               <div className="row between" style={{ marginBottom: 12 }}>
                 <Status label={p.status} />
-                <button className="btn ghost sm"><Icon name="dots" size={14} /></button>
               </div>
               <div className="serif" style={{ fontSize: 24, letterSpacing: "-0.01em", lineHeight: 1.1 }}>{p.name}</div>
               <div className="muted" style={{ fontSize: 12, marginTop: 8 }}>{p.note}</div>
@@ -218,11 +217,6 @@ const ProjectsScreen = () => {
                 <span className="mono">{Math.round(p.progress * 100)}%</span>
               </div>
               <div className="bar"><i style={{ width: `${p.progress*100}%`, background: "var(--positive)" }} /></div>
-
-              <div className="row gap-2" style={{ marginTop: 18 }}>
-                <button className="btn sm">Open</button>
-                <button className="btn sm ghost">Notes</button>
-              </div>
             </div>
           ))}
 

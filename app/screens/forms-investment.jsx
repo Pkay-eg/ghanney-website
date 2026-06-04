@@ -169,7 +169,7 @@ const InvestmentForm = ({ onClose, onSubmit }) => {
           {step < steps.length - 1 ? (
             <button className="btn primary" onClick={next}>Continue <Icon name="arrowRight" size={12} /></button>
           ) : (
-            <button className="btn primary" onClick={submit}><Icon name="plus" size={12} />{mode === "new" ? "Add investment" : "Record investment"}</button>
+            <SubmitButton onSubmit={submit}><Icon name="plus" size={12} />{mode === "new" ? "Add investment" : "Record investment"}</SubmitButton>
           )}
         </>
       }

@@ -77,17 +77,20 @@ const Sidebar = ({ active, onNav, mode, open }) => {
           <span className="meta">{(window.integrations || []).length}</span>
         )}
       </button>
-      <button className="nav-item">
-        <span className="ic"><Icon name="calendar" size={16} /></span>
-        <span>Calendar</span>
-      </button>
-      <button className="nav-item">
+      <button className="nav-item" onClick={() => window.__export?.("investments")} title="Export your data as CSV">
         <span className="ic"><Icon name="download" size={16} /></span>
         <span>Statements</span>
+        <span className="meta">CSV</span>
       </button>
-      <button className="nav-item">
+      <button className="nav-item" onClick={() => window.__toast?.("Calendar is coming soon")}>
+        <span className="ic"><Icon name="calendar" size={16} /></span>
+        <span>Calendar</span>
+        <span className="meta" style={{ opacity: 0.7 }}>Soon</span>
+      </button>
+      <button className="nav-item" onClick={() => window.__toast?.("Settings are coming soon")}>
         <span className="ic"><Icon name="settings" size={16} /></span>
         <span>Settings</span>
+        <span className="meta" style={{ opacity: 0.7 }}>Soon</span>
       </button>
 
       <div style={{ flex: 1 }} />
@@ -212,11 +215,11 @@ const TopNav = ({ active, onNav }) => (
       ))}
     </div>
     <div style={{ flex: 1 }} />
-    <div className="search" style={{ width: 240 }}>
+    <button className="search" style={{ width: 240, cursor: "text" }} onClick={() => window.__cmd?.()} aria-label="Search (Command K)">
       <Icon name="search" size={14} />
-      <input placeholder="Jump to…" />
+      <input placeholder="Jump to…" readOnly style={{ cursor: "text", pointerEvents: "none" }} />
       <span className="kbd">⌘K</span>
-    </div>
+    </button>
     <NotificationBell onNav={onNav} />
     <div className="avatar">{(window.__myInfo?.() || {}).initials || "U"}</div>
   </div>
@@ -232,11 +235,11 @@ const Topbar = ({ title, subtitle, actions }) => {
       </div>
       <div className="row gap-3">
         <CurrencySwitch size="sm" />
-        <div className="search">
+        <button className="search" style={{ cursor: "text" }} onClick={() => window.__cmd?.()} aria-label="Search (Command K)">
           <Icon name="search" size={14} />
-          <input placeholder="Search assets, loans, transactions…" />
+          <input placeholder="Search assets, loans, transactions…" readOnly style={{ cursor: "text", pointerEvents: "none" }} />
           <span className="kbd">⌘K</span>
-        </div>
+        </button>
         <NotificationBell />
         <div style={{ position: "relative" }}>
           <button
@@ -261,20 +264,44 @@ const Topbar = ({ title, subtitle, actions }) => {
   );
 };
 
-// Command palette overlay (cosmetic — opens via ⌘K)
+// Command palette overlay — navigate, run actions, export, jump to assets (⌘K)
 const CommandPalette = ({ open, onClose, onNav }) => {
-  const items = [
-    { label: "Go to Overview", action: () => onNav("overview"), kind: "Nav" },
-    { label: "Go to Investments", action: () => onNav("investments"), kind: "Nav" },
-    { label: "Go to Loans", action: () => onNav("loans"), kind: "Nav" },
-    { label: "Go to Trading", action: () => onNav("trading"), kind: "Nav" },
-    { label: "Log a loan repayment", action: () => onClose(), kind: "Action" },
-    { label: "Record commission earned", action: () => onClose(), kind: "Action" },
-    { label: "Add new investment", action: () => onClose(), kind: "Action" },
-    { label: "Export statements (PDF)", action: () => onClose(), kind: "Action" },
-  ];
   const [q, setQ] = useState("");
-  const filtered = items.filter((i) => i.label.toLowerCase().includes(q.toLowerCase()));
+  const [hi, setHi] = useState(0);
+
+  const go = (page, id = null) => { onClose(); (window.__nav || onNav)(page, id); };
+  const openForm = (type, props) => { onClose(); window.__openForm?.(type, props); };
+  const exportData = (kind) => { onClose(); window.__export?.(kind); };
+
+  const items = [];
+  (window.NAV || []).forEach((n) => items.push({ label: `Go to ${n.label}`, kind: "Page", icon: n.icon, action: () => go(n.id) }));
+  items.push({ label: "Go to Team", kind: "Page", icon: "user", action: () => go("team") });
+  items.push({ label: "Go to Integrations", kind: "Page", icon: "link", action: () => go("integrations") });
+  items.push({ label: "Add an investment", kind: "Create", icon: "invest", action: () => openForm("investment") });
+  items.push({ label: "Record an investment payment", kind: "Create", icon: "invest", action: () => openForm("investment-payment") });
+  items.push({ label: "Issue a loan", kind: "Create", icon: "loans", action: () => openForm("loan") });
+  items.push({ label: "Log a loan repayment", kind: "Create", icon: "check", action: () => openForm("payment") });
+  items.push({ label: "Record income", kind: "Create", icon: "income", action: () => openForm("income") });
+  items.push({ label: "Add a trade", kind: "Create", icon: "trading", action: () => openForm("trade") });
+  items.push({ label: "New project", kind: "Create", icon: "projects", action: () => openForm("project") });
+  items.push({ label: "Upload a contract", kind: "Create", icon: "contract", action: () => openForm("contract") });
+  items.push({ label: "Log a site update", kind: "Create", icon: "building", action: () => openForm("site-update") });
+  items.push({ label: "Connect an account", kind: "Create", icon: "link", action: () => openForm("integration") });
+  items.push({ label: "Export investments (CSV)", kind: "Export", icon: "download", action: () => exportData("investments") });
+  items.push({ label: "Export loans (CSV)", kind: "Export", icon: "download", action: () => exportData("loans") });
+  items.push({ label: "Export net worth (CSV)", kind: "Export", icon: "download", action: () => exportData("networth") });
+  (window.investments || []).forEach((i) => items.push({ label: i.name, kind: "Asset", icon: "invest", action: () => go("investments", i.id) }));
+  (window.loans || []).forEach((l) => items.push({ label: `Loan · ${l.borrower}`, kind: "Loan", icon: "loans", action: () => go("loans", l.id) }));
+
+  const filtered = q ? items.filter((i) => i.label.toLowerCase().includes(q.toLowerCase())) : items;
+  const clampHi = Math.min(hi, Math.max(0, filtered.length - 1));
+
+  const onKey = (e) => {
+    if (e.key === "ArrowDown") { e.preventDefault(); setHi((h) => Math.min(filtered.length - 1, h + 1)); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); setHi((h) => Math.max(0, h - 1)); }
+    else if (e.key === "Enter") { e.preventDefault(); filtered[clampHi]?.action(); }
+  };
+
   if (!open) return null;
   return (
     <div
@@ -288,14 +315,16 @@ const CommandPalette = ({ open, onClose, onNav }) => {
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
-          width: 560, background: "var(--surface-2)", border: "1px solid var(--line)",
+          width: 560, maxWidth: "94vw", background: "var(--surface-2)", border: "1px solid var(--line)",
           borderRadius: 14, boxShadow: "0 24px 60px -20px rgba(0,0,0,0.3)", overflow: "hidden",
         }}
       >
         <div className="row gap-3" style={{ padding: "14px 16px", borderBottom: "1px solid var(--line)" }}>
           <Icon name="search" size={16} />
           <input
-            autoFocus value={q} onChange={(e) => setQ(e.target.value)}
+            autoFocus value={q}
+            onChange={(e) => { setQ(e.target.value); setHi(0); }}
+            onKeyDown={onKey}
             placeholder="Type a command, page, or asset…"
             style={{ border: "none", outline: "none", flex: 1, background: "none", fontSize: 14 }}
           />
@@ -306,16 +335,18 @@ const CommandPalette = ({ open, onClose, onNav }) => {
             <button
               key={i}
               onClick={it.action}
+              onMouseEnter={() => setHi(i)}
               style={{
-                width: "100%", display: "flex", justifyContent: "space-between",
-                padding: "10px 12px", borderRadius: 8, fontSize: 13,
-                alignItems: "center",
+                width: "100%", display: "flex", justifyContent: "space-between", gap: 10,
+                padding: "10px 12px", borderRadius: 8, fontSize: 13, alignItems: "center",
+                background: i === clampHi ? "var(--canvas)" : "transparent",
               }}
-              onMouseEnter={(e) => e.currentTarget.style.background = "var(--canvas)"}
-              onMouseLeave={(e) => e.currentTarget.style.background = ""}
             >
-              <span>{it.label}</span>
-              <span className="tag">{it.kind}</span>
+              <span className="row gap-3" style={{ minWidth: 0 }}>
+                <span className="muted" style={{ display: "inline-flex" }}><Icon name={it.icon || "arrowRight"} size={14} /></span>
+                <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{it.label}</span>
+              </span>
+              <span className="tag" style={{ flexShrink: 0 }}>{it.kind}</span>
             </button>
           ))}
           {filtered.length === 0 && (

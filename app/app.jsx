@@ -146,6 +146,9 @@ const App = () => {
   // Expose investment display setter so InvestmentsList can change it from header toggle
   window.__setInvestDisplay = (v) => setTweak("investDisplay", v);
 
+  // Expose command-palette opener so the search bars can trigger it
+  window.__cmd = () => setShowCmd(true);
+
   const nav = (page, id = null) => {
     setRoute({ page, id });
     window.scrollTo({ top: 0, behavior: "smooth" });

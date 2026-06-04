@@ -378,8 +378,8 @@ const InvestmentDetail = ({ inv, onBack }) => {
                 <div className="h-section" style={{ marginTop: 4 }}>{Math.round(inv.progress * 100)}% complete · handover {inv.handover || "TBD"}</div>
               </div>
               <div className="row gap-2">
-                <button className="btn sm">Site updates</button>
-                <button className="btn sm">Contract docs</button>
+                <button className="btn sm" onClick={() => window.__openForm?.("site-update", { defaultInvestmentId: inv.id })}>Log site update</button>
+                <button className="btn sm" onClick={() => window.__nav?.("contracts")}>Contract docs</button>
               </div>
             </div>
             <div style={{ position: "relative", padding: "30px 0 8px" }}>
