@@ -94,7 +94,7 @@ const ContractForm = ({ onClose, defaultLinkedTo = null }) => {
       <SidePanel open onClose={onClose} title="Done">
         <SuccessCard
           title="Contract stored."
-          message={`"${done.name}" is now in your document vault. Kwame Asante has been notified for review.`}
+          message={`"${done.name}" is now in your document vault.`}
           onClose={onClose}
         />
       </SidePanel>
@@ -194,7 +194,7 @@ const ContractForm = ({ onClose, defaultLinkedTo = null }) => {
         </Field>
         <div className="row gap-3" style={{ padding: "10px 12px", background: "var(--canvas)", borderRadius: 8 }}>
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 13, fontWeight: 500 }}>Notify Kwame Asante</div>
+            <div style={{ fontSize: 13, fontWeight: 500 }}>Notify {(window.team || []).find((m) => m.role === "Lawyer")?.name || "counsel"}</div>
             <div className="muted" style={{ fontSize: 11.5, marginTop: 2 }}>Sends a review request to your lawyer.</div>
           </div>
           <Switch value={form.notifyCounsel} onChange={(v) => set("notifyCounsel", v)} />

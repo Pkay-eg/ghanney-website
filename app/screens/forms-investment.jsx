@@ -120,6 +120,14 @@ const InvestmentForm = ({ onClose, onSubmit }) => {
       const saved = window.db?.isConfigured?.()
         ? await window.db.investments.create(inv)
         : (window.investments.unshift({ ...inv, id: `inv-${Date.now()}` }), window.investments[0]);
+      // Remember this name as a reusable beneficiary for future records.
+      window.bens?.upsert?.({
+        name: form.name,
+        type: "Investment",
+        location: form.location,
+        org: form.developer,
+        currency: form.currency,
+      });
       window.__bumpRev?.();
       setDone(saved);
     } catch (e) {
@@ -194,8 +202,20 @@ const InvestmentForm = ({ onClose, onSubmit }) => {
       {step === 1 && (
         <>
           <FormSection title="Basics">
-            <Field label="Name" required hint="A short label you'll recognise.">
-              <Input value={form.name} onChange={(v) => set("name", v)} placeholder={isReal ? "e.g. Cantonments Heights — Unit 8B" : isBiz ? "e.g. Scoop & Co. — Ice Cream Parlour" : "e.g. Eastern Corridor SPV"} autoFocus />
+            <Field label="Name" required hint="Pick a saved beneficiary to reuse its details, or type a new name.">
+              <BeneficiaryPicker
+                value={form.name}
+                onChange={(v) => set("name", v)}
+                onPick={(b) => setForm((f) => ({
+                  ...f,
+                  name: b.name,
+                  location: b.location || f.location,
+                  developer: b.org || f.developer,
+                  currency: b.currency || f.currency,
+                }))}
+                placeholder={isReal ? "e.g. Cantonments Heights — Unit 8B" : isBiz ? "e.g. Scoop & Co. — Ice Cream Parlour" : "e.g. Eastern Corridor SPV"}
+                autoFocus
+              />
             </Field>
             {isReal && (
               <Field label="Location" required>

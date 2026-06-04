@@ -31,9 +31,46 @@ const pctChange = (curr, prev) => {
   return ((curr - prev) / prev) * 100;
 };
 
+// Slice a monthly series (entries shaped { m: "May 26", value }) down to a
+// selected time period. "1M"/"3M"/... include one extra point at the start so
+// the chart can draw the change across that window. "YTD" anchors on the last
+// point of the prior year; "All" returns the whole series untouched.
+const PERIOD_MONTHS = { "1M": 1, "3M": 3, "6M": 6, "1Y": 12, "2Y": 24 };
+const yearOf = (entry) => parseInt((entry.m || "").split(" ")[1] || "0", 10);
+const sliceSeriesByPeriod = (series, period) => {
+  if (!Array.isArray(series) || series.length === 0 || period === "All") return series;
+  if (period === "YTD") {
+    const latestYear = yearOf(series[series.length - 1]);
+    let start = series.findIndex((e) => yearOf(e) === latestYear);
+    if (start === -1) return series;
+    if (start > 0) start -= 1; // include prior year-end as the YTD baseline
+    return series.slice(start);
+  }
+  const months = PERIOD_MONTHS[period];
+  if (!months) return series;
+  return series.slice(Math.max(0, series.length - (months + 1)));
+};
+
+// Period filter buttons for a net-worth chart. Controlled by the caller's state.
+const PeriodTabs = ({ periods, value, onChange }) => (
+  <div className="row gap-2 period-tabs">
+    {periods.map((t) => (
+      <button
+        key={t}
+        className={`btn sm ${t === value ? "primary" : ""}`}
+        onClick={() => onChange(t)}
+      >
+        {t}
+      </button>
+    ))}
+  </div>
+);
+
 // ---------- Executive — hero net worth + scannable grid ----------
 const DashboardExecutive = ({ onNav, showSensitive }) => {
   const $ = useMoney();
+  const [nwPeriod, setNwPeriod] = React.useState("1Y");
+  const nwChartData = sliceSeriesByPeriod(netWorthMonthly, nwPeriod);
   const nwSeries = netWorthMonthly.map((d) => d.value);
   const lastNW = nwSeries[nwSeries.length - 1] || 0;
   const monthDelta = pctChange(lastNW, nwSeries[nwSeries.length - 2]);
@@ -91,11 +128,7 @@ const DashboardExecutive = ({ onNav, showSensitive }) => {
                 </div>
               </div>
               <div className="col items-end gap-3">
-                <div className="row gap-2">
-                  {["1M", "3M", "6M", "YTD", "1Y", "All"].map((t, i) => (
-                    <button key={t} className={`btn sm ${t === "1Y" ? "primary" : ""}`}>{t}</button>
-                  ))}
-                </div>
+                <PeriodTabs periods={["1M", "3M", "6M", "YTD", "1Y", "All"]} value={nwPeriod} onChange={setNwPeriod} />
                 <button className="btn sm" onClick={() => onNav("networth")}>
                   Details <Icon name="arrowRight" size={12} />
                 </button>
@@ -104,7 +137,7 @@ const DashboardExecutive = ({ onNav, showSensitive }) => {
 
             <div style={{ marginTop: 18 }}>
               <AreaChart
-                data={netWorthMonthly}
+                data={nwChartData}
                 valueKey="value"
                 color="var(--positive)"
                 height={220}

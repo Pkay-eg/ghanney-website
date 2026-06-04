@@ -77,6 +77,8 @@ const LoanForm = ({ onClose }) => {
       const saved = window.db?.isConfigured?.()
         ? await window.db.loans.create(loan)
         : (window.loans.unshift({ ...loan, id: `ln-${Date.now()}` }), window.loans[0]);
+      // Remember this borrower as a reusable beneficiary for future records.
+      window.bens?.upsert?.({ name: form.borrower, type: form.type, currency: form.currency });
       window.__bumpRev?.();
       setDone(saved);
     } catch (e) {
@@ -109,8 +111,19 @@ const LoanForm = ({ onClose }) => {
       }
     >
       <FormSection title="Borrower">
-        <Field label="Name" required>
-          <Input value={form.borrower} onChange={(v) => set("borrower", v)} placeholder="e.g. Akua Mensah or Kontact Logistics Ltd." autoFocus />
+        <Field label="Name" required hint="Pick a saved beneficiary to reuse, or type a new one.">
+          <BeneficiaryPicker
+            value={form.borrower}
+            onChange={(v) => set("borrower", v)}
+            onPick={(b) => setForm((f) => ({
+              ...f,
+              borrower: b.name,
+              type: (b.type === "Business" || b.type === "Individual") ? b.type : f.type,
+              currency: b.currency || f.currency,
+            }))}
+            placeholder="e.g. Akua Mensah or Kontact Logistics Ltd."
+            autoFocus
+          />
         </Field>
         <Field label="Borrower type">
           <Segmented value={form.type} onChange={(v) => set("type", v)} options={["Individual", "Business"]} />

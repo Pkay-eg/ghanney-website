@@ -141,9 +141,8 @@ const IncomeScreen = () => {
               </div>
             </div>
             {(() => {
-              const live = window.db?.isConfigured?.();
               const records = window.incomeRecords || [];
-              if (live && records.length === 0) {
+              if (records.length === 0) {
                 return (
                   <div style={{ padding: "48px 24px", textAlign: "center", color: "var(--muted)" }}>
                     <div style={{ fontSize: 14, marginBottom: 8 }}>No transactions yet.</div>
@@ -154,20 +153,11 @@ const IncomeScreen = () => {
                   </div>
                 );
               }
-              const rows = records.length > 0
-                ? records.slice(0, 12).map((r) => ({
-                    date: new Date(r.received_on).toLocaleDateString("en-US", { month: "short", day: "2-digit" }),
-                    desc: r.note || `${r.type} from ${r.source}`,
-                    type: r.type, who: r.source, amt: Number(r.amount), ccy: r.currency || "USD",
-                  }))
-                : [
-                    { date: "May 21", desc: "WeWire commission — May settlement", type: "Commission", who: "WeWire FX desk", amt: 28400, ccy: "USD" },
-                    { date: "May 18", desc: "Referral — Greentree Capital intro", type: "Referral",   who: "Greentree Cap.", amt: 4100, ccy: "USD" },
-                    { date: "May 12", desc: "Scoop & Co. — April distribution",   type: "Business",   who: "Scoop & Co.",    amt: 1200, ccy: "USD" },
-                    { date: "Apr 22", desc: "WeWire commission — April settlement", type: "Commission", who: "WeWire FX desk", amt: 31400, ccy: "USD" },
-                    { date: "Apr 14", desc: "Referral — Sunbird Trading desk",    type: "Referral",   who: "Sunbird",        amt: 8800, ccy: "USD" },
-                    { date: "Apr 02", desc: "Scoop & Co. — March distribution",   type: "Business",   who: "Scoop & Co.",    amt: 1200, ccy: "USD" },
-                  ];
+              const rows = records.slice(0, 12).map((r) => ({
+                date: new Date(r.received_on).toLocaleDateString("en-US", { month: "short", day: "2-digit" }),
+                desc: r.note || `${r.type} from ${r.source}`,
+                type: r.type, who: r.source, amt: Number(r.amount), ccy: r.currency || "USD",
+              }));
               return (
                 <table className="table">
                   <thead>
@@ -300,12 +290,40 @@ const ProjectsScreen = () => {
 };
 
 // ---------- Net Worth ----------
+const NETWORTH_GROWTH_LABEL = { "3M": "3-month growth", "6M": "6-month growth", "1Y": "12-month growth", "2Y": "24-month growth", "YTD": "year-to-date growth", "All": "all-time growth" };
+
 const NetWorthScreen = () => {
   const $ = useMoney();
+  const [nwPeriod, setNwPeriod] = React.useState("1Y");
+  const nwChartData = sliceSeriesByPeriod(netWorthMonthly, nwPeriod);
   const last = netWorthMonthly[netWorthMonthly.length - 1]?.value || 0;
-  const first = netWorthMonthly[0]?.value || 0;
+  const first = nwChartData[0]?.value || 0;
   const totalGrowth = last - first;
   const growthPct = first > 0 ? ((last - first) / first) * 100 : null;
+
+  const hasData = (window.netWorthBreakdown || []).length > 0
+    || (window.investments || []).length > 0
+    || (window.loans || []).length > 0;
+
+  if (!hasData) {
+    return (
+      <div className="fade-in" data-screen-label="07 Net Worth">
+        <Topbar title="Net worth" subtitle="Balance sheet" />
+        <div className="content">
+          <div className="card pad-lg" style={{ textAlign: "center", padding: "64px 24px" }}>
+            <div className="serif" style={{ fontSize: 24, marginBottom: 8 }}>Nothing tracked yet</div>
+            <div className="muted" style={{ fontSize: 13, marginBottom: 22 }}>
+              Add an investment, loan or holding and your balance sheet will build here.
+            </div>
+            <div className="row gap-3 center">
+              <button className="btn primary" onClick={() => window.__openForm?.("investment")}><Icon name="plus" size={12} />Add investment</button>
+              <button className="btn" onClick={() => window.__openForm?.("loan")}>Record a loan</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fade-in" data-screen-label="07 Net Worth">
@@ -319,18 +337,14 @@ const NetWorthScreen = () => {
                 <div style={{ marginTop: 10 }}><Display value={last} from="USD" /></div>
                 <div className="row gap-3" style={{ marginTop: 12 }}>
                   <Delta value={growthPct} />
-                  <span className="muted" style={{ fontSize: 12.5 }}>12-month growth · </span>
+                  <span className="muted" style={{ fontSize: 12.5 }}>{NETWORTH_GROWTH_LABEL[nwPeriod] || "growth"} · </span>
                   <span className={`mono ${totalGrowth >= 0 ? "pos" : "neg"}`}>{totalGrowth >= 0 ? "+" : ""}{$.fmt(totalGrowth)}</span>
                 </div>
               </div>
-              <div className="row gap-2">
-                {["3M", "6M", "1Y", "2Y", "All"].map((t) => (
-                  <button key={t} className={`btn sm ${t === "1Y" ? "primary" : ""}`}>{t}</button>
-                ))}
-              </div>
+              <PeriodTabs periods={["3M", "6M", "1Y", "2Y", "All"]} value={nwPeriod} onChange={setNwPeriod} />
             </div>
             <div style={{ marginTop: 18 }}>
-              <AreaChart data={netWorthMonthly} valueKey="value" color="var(--positive)" height={260}
+              <AreaChart data={nwChartData} valueKey="value" color="var(--positive)" height={260}
                 formatY={(v) => $.fmtK(v)} formatTip={(v) => $.fmt(v)} />
             </div>
           </div>
@@ -371,57 +385,48 @@ const NetWorthScreen = () => {
             ))}
           </div>
 
-          <div className="card span-6">
-            <div className="eyebrow" style={{ marginBottom: 14 }}>Monthly contributions to growth</div>
-            <table className="table">
-              <thead>
-                <tr><th>Source</th><th className="num">Contribution</th><th>Share</th></tr>
-              </thead>
-              <tbody>
-                {[
-                  ["Real estate appreciation", 38400, 53],
-                  ["Trading P&L", 24000, 33],
-                  ["SPV milestone progress", 8200, 11],
-                  ["Business distributions", 1900, 3],
-                ].map((r) => (
-                  <tr key={r[0]}>
-                    <td>{r[0]}</td>
-                    <td className="num mono pos">+${r[1].toLocaleString()}</td>
-                    <td><div className="bar"><i style={{ width: `${r[2]}%`, background: "var(--positive)" }} /></div></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="card span-6">
-            <div className="eyebrow" style={{ marginBottom: 14 }}>Currency exposure</div>
-            <div className="col gap-4">
-              {[
-                { ccy: "USD",  amt: 1320000, share: 78 },
-                { ccy: "AED", amt: 440640,  share: 26 },
-                { ccy: "GHS", amt: 1355750, share: 5,  nativeUsd: 93500 },
-              ].map((c) => (
-                <div key={c.ccy}>
-                  <div className="row between" style={{ marginBottom: 8 }}>
-                    <div className="row gap-3">
-                      <span style={{ fontSize: 14, fontWeight: 500, fontFamily: "var(--font-mono)" }}>{c.ccy}</span>
-                      <span className="muted" style={{ fontSize: 11 }}>denominated assets</span>
-                    </div>
-                    <div className="col items-end">
-                      <span className="mono" style={{ fontSize: 13 }}>{$.fmt(c.amt, c.ccy)}</span>
-                      {c.ccy !== $.display && <span className="muted mono" style={{ fontSize: 10 }}>{formatCurrency(c.amt, c.ccy)}</span>}
-                    </div>
-                  </div>
-                  <div className="bar"><i style={{ width: `${c.share}%` }} /></div>
+          {(() => {
+            // Currency exposure derived from your real holdings: investment
+            // values + outstanding loan principal, grouped by native currency.
+            const exp = {};
+            (window.investments || []).forEach((i) => {
+              const c = i.currency || "USD";
+              exp[c] = (exp[c] || 0) + (Number(i.valueNow) || 0);
+            });
+            (window.loans || []).forEach((l) => {
+              const c = l.currency || "USD";
+              exp[c] = (exp[c] || 0) + Math.max(0, (Number(l.principal) || 0) - (Number(l.paidBack) || 0));
+            });
+            const entries = Object.entries(exp).filter(([, v]) => v > 0);
+            if (entries.length === 0) return null;
+            const totalUsd = entries.reduce((s, [c, v]) => s + convertFx(v, c, "USD"), 0);
+            entries.sort((a, b) => convertFx(b[1], b[0], "USD") - convertFx(a[1], a[0], "USD"));
+            return (
+              <div className="card span-6">
+                <div className="eyebrow" style={{ marginBottom: 14 }}>Currency exposure</div>
+                <div className="col gap-4">
+                  {entries.map(([ccy, amt]) => {
+                    const share = totalUsd ? Math.round((convertFx(amt, ccy, "USD") / totalUsd) * 100) : 0;
+                    return (
+                      <div key={ccy}>
+                        <div className="row between" style={{ marginBottom: 8 }}>
+                          <div className="row gap-3">
+                            <span style={{ fontSize: 14, fontWeight: 500, fontFamily: "var(--font-mono)" }}>{ccy}</span>
+                            <span className="muted" style={{ fontSize: 11 }}>denominated assets</span>
+                          </div>
+                          <div className="col items-end">
+                            <span className="mono" style={{ fontSize: 13 }}>{$.fmt(amt, ccy)}</span>
+                            {ccy !== $.display && <span className="muted mono" style={{ fontSize: 10 }}>{formatCurrency(amt, ccy)}</span>}
+                          </div>
+                        </div>
+                        <div className="bar"><i style={{ width: `${share}%` }} /></div>
+                      </div>
+                    );
+                  })}
                 </div>
-              ))}
-            </div>
-            <div className="hr" style={{ margin: "18px 0" }} />
-            <div style={{ fontSize: 11, color: "var(--muted)", lineHeight: 1.5 }}>
-              Properties in Ghana are USD-denominated; GHS exposure comes from deferred salary accrual and family-loan principal. Watch AED/USD peg stability as Dubai exposure grows.
-            </div>
-          </div>
+              </div>
+            );
+          })()}
         </div>
       </div>
     </div>

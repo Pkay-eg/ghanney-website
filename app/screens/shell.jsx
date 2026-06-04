@@ -39,9 +39,9 @@ const navMeta = (id) => {
   return "";
 };
 
-const Sidebar = ({ active, onNav, mode }) => {
+const Sidebar = ({ active, onNav, mode, open }) => {
   return (
-    <aside className="sidebar">
+    <aside className={`sidebar ${open ? "open" : ""}`}>
       <div className="brand">
         <span className="word">ghanney</span>
         <span className="dot-after">.</span>
@@ -120,6 +120,85 @@ const Sidebar = ({ active, onNav, mode }) => {
   );
 };
 
+// ---------- Notification bell + dropdown ----------
+const NotificationBell = ({ onNav }) => {
+  const [open, setOpen] = React.useState(false);
+  const [, force] = React.useReducer((n) => n + 1, 0);
+  const nav = onNav || window.__nav || (() => {});
+
+  const items = (window.notify?.build?.() || []);
+  const attention = items.filter((n) => n.severity !== "info" && !n.read).length;
+  const anyUnread = items.some((n) => !n.read);
+
+  React.useEffect(() => {
+    if (!open) return;
+    const onKey = (e) => { if (e.key === "Escape") setOpen(false); };
+    const onDown = (e) => { if (!e.target.closest?.(".notif-wrap")) setOpen(false); };
+    window.addEventListener("keydown", onKey);
+    document.addEventListener("mousedown", onDown);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.removeEventListener("mousedown", onDown);
+    };
+  }, [open]);
+
+  const go = (n) => {
+    window.notify?.markRead?.(n.id);
+    setOpen(false);
+    if (n.nav) nav(n.nav);
+  };
+
+  return (
+    <div className="notif-wrap" style={{ position: "relative" }}>
+      <button
+        className="btn icon"
+        title="Notifications"
+        aria-label={attention > 0 ? `Notifications, ${attention} need attention` : "Notifications"}
+        onClick={() => setOpen((s) => !s)}
+        style={{ position: "relative" }}
+      >
+        <Icon name="bell" size={16} />
+        {attention > 0 && <span className="notif-badge">{attention > 9 ? "9+" : attention}</span>}
+      </button>
+
+      {open && (
+        <div className="notif-panel" role="dialog" aria-label="Notifications">
+          <div className="notif-head">
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontWeight: 600, fontSize: 14 }}>Notifications</div>
+              <div className="muted" style={{ fontSize: 11.5 }}>
+                {attention > 0 ? `${attention} need${attention === 1 ? "s" : ""} attention` : "You're all caught up"}
+              </div>
+            </div>
+            {anyUnread && (
+              <button className="btn ghost sm" onClick={() => { window.notify?.markAllRead?.(); force(); }}>Mark all read</button>
+            )}
+          </div>
+
+          <div className="notif-list">
+            {items.length === 0 ? (
+              <div className="notif-empty">
+                <span className="notif-ic info" style={{ margin: "0 auto" }}><Icon name="check" size={16} /></span>
+                <div style={{ marginTop: 10, fontWeight: 500, color: "var(--ink)" }}>Nothing needs your attention</div>
+                <div style={{ marginTop: 2 }}>Due payments, expiring contracts and sync issues will appear here.</div>
+              </div>
+            ) : items.map((n) => (
+              <button key={n.id} className={`notif-item ${n.read ? "read" : ""}`} onClick={() => go(n)}>
+                <span className={`notif-ic ${n.severity}`}><Icon name={n.icon} size={14} /></span>
+                <span className="col" style={{ minWidth: 0, flex: 1 }}>
+                  <span className="notif-title">{n.title}</span>
+                  {n.detail && <span className="notif-detail">{n.detail}</span>}
+                </span>
+                {!n.read && <span className={`dot ${n.severity === "urgent" ? "neg" : n.severity === "warn" ? "warn" : "muted"}`} style={{ marginTop: 7, flexShrink: 0 }} />}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const TopNav = ({ active, onNav }) => (
   <div className="topnav">
     <div className="brand">ghanney<span style={{ color: "var(--positive)" }}>.</span></div>
@@ -138,7 +217,7 @@ const TopNav = ({ active, onNav }) => (
       <input placeholder="Jump to…" />
       <span className="kbd">⌘K</span>
     </div>
-    <button className="btn icon" title="Notifications"><Icon name="bell" size={16} /></button>
+    <NotificationBell onNav={onNav} />
     <div className="avatar">{(window.__myInfo?.() || {}).initials || "U"}</div>
   </div>
 );
@@ -158,9 +237,7 @@ const Topbar = ({ title, subtitle, actions }) => {
           <input placeholder="Search assets, loans, transactions…" />
           <span className="kbd">⌘K</span>
         </div>
-        <button className="btn icon" title="Notifications">
-          <Icon name="bell" size={16} />
-        </button>
+        <NotificationBell />
         <div style={{ position: "relative" }}>
           <button
             className="btn primary"
@@ -250,4 +327,4 @@ const CommandPalette = ({ open, onClose, onNav }) => {
   );
 };
 
-Object.assign(window, { Sidebar, TopNav, Topbar, CommandPalette, NAV });
+Object.assign(window, { Sidebar, TopNav, Topbar, CommandPalette, NotificationBell, NAV });

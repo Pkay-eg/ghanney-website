@@ -31,6 +31,7 @@ const Icon = ({ name, size = 16, stroke = 1.6 }) => {
     chevDown: <><path d="M6 9l6 6 6-6" /></>,
     chevRight: <><path d="M9 6l6 6-6 6" /></>,
     dots: <><circle cx="5" cy="12" r="1.4" /><circle cx="12" cy="12" r="1.4" /><circle cx="19" cy="12" r="1.4" /></>,
+    menu: <><path d="M4 6h16M4 12h16M4 18h16" /></>,
     home: <><path d="M3 11l9-8 9 8" /><path d="M5 10v10h14V10" /></>,
     building: <><path d="M4 21V5l8-2v18" /><path d="M12 21V8l8 2v11" /><path d="M7 8h2M7 12h2M7 16h2M15 12h2M15 16h2" /></>,
     storefront: <><path d="M3 9l1-5h16l1 5" /><path d="M4 9v12h16V9" /><path d="M3 9c0 2 2 3 4.5 3S12 11 12 9c0 2 2 3 4.5 3S21 11 21 9" /></>,
@@ -119,7 +120,15 @@ const Sparkline = ({ data, color = "var(--ink)", fill = false, height = 36, stro
 };
 
 // ---------- Area chart with grid + labels ----------
+const ChartEmpty = ({ height = 240, label = "No data yet" }) => (
+  <div style={{
+    height, display: "flex", alignItems: "center", justifyContent: "center",
+    color: "var(--muted)", fontSize: 12.5, border: "1px dashed var(--line)", borderRadius: 12,
+  }}>{label}</div>
+);
+
 const AreaChart = ({ data, valueKey, labelKey = "m", color = "var(--ink)", height = 240, formatY = (v) => v, formatTip = (v) => v }) => {
+  if (!data || data.length === 0) return <ChartEmpty height={height} />;
   const w = 800;
   const h = height;
   const pad = { l: 50, r: 16, t: 14, b: 28 };
@@ -187,6 +196,7 @@ const AreaChart = ({ data, valueKey, labelKey = "m", color = "var(--ink)", heigh
 
 // ---------- Stacked bar chart (months) ----------
 const StackedBars = ({ data, keys, colors, labelKey = "m", height = 200, formatY = (v) => v }) => {
+  if (!data || data.length === 0) return <ChartEmpty height={height} />;
   const w = 800;
   const h = height;
   const pad = { l: 50, r: 16, t: 14, b: 28 };
