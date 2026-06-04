@@ -165,6 +165,7 @@ const App = () => {
       case "payment":     return <PaymentForm onClose={close} {...(openForm.props || {})} />;
       case "contract":    return <ContractForm onClose={close} {...(openForm.props || {})} />;
       case "site-update": return <SiteUpdateForm onClose={close} {...(openForm.props || {})} />;
+      case "investment-payment": return <InvestmentPaymentForm onClose={close} {...(openForm.props || {})} />;
       case "team":        return <TeamInviteForm onClose={close} />;
       case "team-edit":   return <TeamInviteForm onClose={close} {...(openForm.props || {})} />;
       case "integration": return (

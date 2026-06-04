@@ -487,6 +487,13 @@ const QuickAddMenu = ({ open, onClose, onPick }) => {
           <div className="meta">Mark a payment as received</div>
         </span>
       </button>
+      <button className="qa-item" onClick={() => onPick("investment-payment")}>
+        <span className="ic"><Icon name="invest" size={14} /></span>
+        <span style={{ flex: 1 }}>
+          Investment payment
+          <div className="meta">Log a payment made toward an asset</div>
+        </span>
+      </button>
       <button className="qa-item" onClick={() => onPick("site-update")}>
         <span className="ic"><Icon name="building" size={14} /></span>
         <span style={{ flex: 1 }}>

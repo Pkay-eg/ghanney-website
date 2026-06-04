@@ -279,18 +279,19 @@ const InvestmentMap = ({ items, onOpen }) => {
 // ---------- Detail ----------
 const InvestmentDetail = ({ inv, onBack }) => {
   const $ = useMoney();
-  const gain = ((inv.valueNow - inv.priceTotal) / inv.priceTotal) * 100;
+  const gain = inv.priceTotal ? ((inv.valueNow - inv.priceTotal) / inv.priceTotal) * 100 : 0;
 
-  // payment schedule mock
-  const totalInstalments = 8;
-  const paidPercent = inv.paid / inv.priceTotal;
-  const instalmentsPaid = Math.floor(paidPercent * totalInstalments);
-  const sched = Array.from({ length: totalInstalments }, (_, i) => ({
-    n: i + 1,
-    amount: inv.priceTotal / totalInstalments,  // native currency
-    date: ["Jan 25", "Apr 25", "Jul 25", "Oct 25", "Jan 26", "Apr 26", "Jul 26", "Oct 26"][i] || "TBD",
-    status: i < instalmentsPaid ? "Paid" : i === instalmentsPaid ? "Next" : "Scheduled",
-  }));
+  // Real payments made toward this asset, most-recent first.
+  const payments = (window.__investmentPayments || [])
+    .filter((p) => p.investment_id === inv.id)
+    .slice()
+    .sort((a, b) => new Date(b.paid_on) - new Date(a.paid_on));
+  const paymentsTotal = payments.reduce((s, p) => s + Number(p.amount || 0), 0);
+  const fmtPaidOn = (s) => {
+    const d = new Date(s);
+    return isNaN(d.getTime()) ? s : d.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "2-digit" });
+  };
+  const addPayment = () => window.__openForm?.("investment-payment", { defaultInvestmentId: inv.id });
 
   return (
     <div className="fade-in">
@@ -362,7 +363,7 @@ const InvestmentDetail = ({ inv, onBack }) => {
                   <div className="col items-end">
                     <div className="mono" style={{ fontSize: 18 }}>{$.fmt(inv.nextPayment.amount, inv.currency)}</div>
                     {inv.currency !== $.display && <div className="muted mono" style={{ fontSize: 11 }}>{formatCurrency(inv.nextPayment.amount, inv.currency)}</div>}
-                    <button className="btn sm primary" style={{ marginTop: 8 }}>Mark paid</button>
+                    <button className="btn sm primary" style={{ marginTop: 8 }} onClick={() => window.__openForm?.("investment-payment", { defaultInvestmentId: inv.id, defaultAmount: inv.nextPayment.amount })}>Mark paid</button>
                   </div>
                 </div>
               </div>
@@ -396,33 +397,42 @@ const InvestmentDetail = ({ inv, onBack }) => {
             </div>
           </div>
 
-          {/* Schedule + activity */}
+          {/* Payment history */}
           <div className="card span-7">
             <div className="row between" style={{ marginBottom: 12 }}>
-              <div className="eyebrow">Payment schedule</div>
-              <button className="btn sm"><Icon name="download" size={12} />Export</button>
+              <div>
+                <div className="eyebrow">Payment history</div>
+                {payments.length > 0 && (
+                  <div className="muted" style={{ fontSize: 11.5, marginTop: 4 }}>
+                    {payments.length} payment{payments.length > 1 ? "s" : ""} · {$.fmt(paymentsTotal, inv.currency)} logged
+                  </div>
+                )}
+              </div>
+              <button className="btn sm primary" onClick={addPayment}><Icon name="plus" size={12} />Add payment</button>
             </div>
-            <table className="table">
-              <thead>
-                <tr><th>#</th><th>Date</th><th className="num">Amount</th><th>Status</th><th></th></tr>
-              </thead>
-              <tbody>
-                {sched.map((s) => (
-                  <tr key={s.n}>
-                    <td className="mono muted" style={{ fontSize: 11 }}>{String(s.n).padStart(2, "0")}</td>
-                    <td>{s.date}</td>
-                    <td className="num mono">{$.fmt(s.amount, inv.currency)}</td>
-                    <td>
-                      <span className={`chip ${s.status === "Paid" ? "pos" : s.status === "Next" ? "warn" : ""}`}>
-                        {s.status === "Paid" && <Icon name="check" size={10} stroke={2.5} />}
-                        {s.status}
-                      </span>
-                    </td>
-                    <td className="muted"><Icon name="dots" size={14} /></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            {payments.length === 0 ? (
+              <div style={{ textAlign: "center", color: "var(--muted)", padding: "32px 16px" }}>
+                <div style={{ fontSize: 13, marginBottom: 6 }}>No payments logged yet.</div>
+                <div style={{ fontSize: 12, marginBottom: 16 }}>Record the payments you've made toward this asset, with their real dates.</div>
+                <button className="btn sm" onClick={addPayment}><Icon name="plus" size={12} />Add a payment</button>
+              </div>
+            ) : (
+              <table className="table">
+                <thead>
+                  <tr><th>Date</th><th className="num">Amount</th><th>Method</th><th>Note</th></tr>
+                </thead>
+                <tbody>
+                  {payments.map((p) => (
+                    <tr key={p.id}>
+                      <td className="mono" style={{ fontSize: 12, whiteSpace: "nowrap" }}>{fmtPaidOn(p.paid_on)}</td>
+                      <td className="num mono">{$.fmt(Number(p.amount), p.currency || inv.currency)}</td>
+                      <td style={{ fontSize: 12 }}>{p.method || "—"}</td>
+                      <td className="muted" style={{ fontSize: 12 }}>{p.note || "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
 
           <div className="card span-5">

@@ -30,10 +30,8 @@ const InvestmentForm = ({ onClose, onSubmit }) => {
     handover: "",
     nextPaymentAmount: "",
     nextPaymentDate: "",
-    instalmentCount: 8,
     notes: "",
   });
-  const [instalmentTouched, setInstalmentTouched] = React.useState(false);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
   const outstanding = React.useMemo(() => {
@@ -41,23 +39,6 @@ const InvestmentForm = ({ onClose, onSubmit }) => {
     const paid = parseFloat(form.paid) || 0;
     return Math.max(0, total - paid);
   }, [form.priceTotal, form.paid]);
-
-  const instalmentCalc = React.useMemo(() => {
-    if (!outstanding || !form.instalmentCount) return null;
-    return window.paymentCalc?.splitInstalments?.({
-      outstanding,
-      count: form.instalmentCount,
-    });
-  }, [outstanding, form.instalmentCount]);
-
-  React.useEffect(() => {
-    setInstalmentTouched(false);
-  }, [form.priceTotal, form.paid, form.instalmentCount]);
-
-  React.useEffect(() => {
-    if (instalmentTouched || !instalmentCalc) return;
-    set("nextPaymentAmount", String(instalmentCalc.perInstalment));
-  }, [instalmentCalc, instalmentTouched]);
 
   // Reset secondary fields when mode flips
   React.useEffect(() => {
@@ -149,7 +130,7 @@ const InvestmentForm = ({ onClose, onSubmit }) => {
               type: null, name: "", location: "", developer: "",
               currency: "USD", priceTotal: "", paid: "", equity: "",
               monthlyDistribution: "", acquisitionDate: "", handover: "",
-              nextPaymentAmount: "", nextPaymentDate: "", instalmentCount: 8, notes: "",
+              nextPaymentAmount: "", nextPaymentDate: "", notes: "",
             });
           }}
         />
@@ -280,49 +261,19 @@ const InvestmentForm = ({ onClose, onSubmit }) => {
         <>
           {(isOffPlan || form.type === "real-estate-dev") && (
             <>
-              <FormSection title="Construction & handover">
-                <div className="input-row">
-                  <Field label="Expected handover">
-                    <Input value={form.handover} onChange={(v) => set("handover", v)} placeholder="Q4 2026" />
-                  </Field>
-                  <Field label="Number of instalments">
-                    <Select
-                      value={form.instalmentCount}
-                      onChange={(v) => set("instalmentCount", v)}
-                      options={[4, 6, 8, 10, 12, 16, 20].map((n) => ({ value: n, label: `${n} instalments` }))}
-                    />
-                  </Field>
-                </div>
+              <FormSection title="Handover">
+                <Field label="Expected handover">
+                  <Input value={form.handover} onChange={(v) => set("handover", v)} placeholder="Q4 2026" />
+                </Field>
               </FormSection>
 
-              <FormSection title="Next payment">
-                {instalmentCalc && (
-                  <PaymentCalcCard
-                    variant="instalment"
-                    title="Suggested instalment (outstanding ÷ count)"
-                    calc={instalmentCalc}
-                    currency={form.currency}
-                    appliedAmount={form.nextPaymentAmount}
-                    onApply={(v) => {
-                      set("nextPaymentAmount", v);
-                      setInstalmentTouched(false);
-                    }}
-                  />
-                )}
-                {form.priceTotal && outstanding <= 0 && (
-                  <div className="muted" style={{ fontSize: 12, marginBottom: 10 }}>
-                    Commitment is fully funded — no instalments to split.
-                  </div>
-                )}
+              <FormSection title="Next payment reminder (optional)">
                 <div className="input-row">
-                  <Field label="Amount" hint="Native currency of the asset — auto-filled when outstanding & instalments are set.">
+                  <Field label="Amount" hint="Native currency of the asset.">
                     <MoneyInput
                       amount={form.nextPaymentAmount}
                       currency={form.currency}
-                      onAmountChange={(v) => {
-                        setInstalmentTouched(true);
-                        set("nextPaymentAmount", v);
-                      }}
+                      onAmountChange={(v) => set("nextPaymentAmount", v)}
                       onCurrencyChange={(v) => set("currency", v)}
                       currencies={[form.currency]}
                     />
@@ -336,6 +287,9 @@ const InvestmentForm = ({ onClose, onSubmit }) => {
                     <Icon name="bell" size={11} /> &nbsp;We'll remind you 5 days before this date.
                   </div>
                 )}
+                <div className="card flat" style={{ padding: "10px 12px", fontSize: 11.5 }}>
+                  <span className="muted">Already made payments on this asset? Once it's created, open it and log each one with its real date under <b>Payment history</b>.</span>
+                </div>
               </FormSection>
             </>
           )}

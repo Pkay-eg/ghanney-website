@@ -687,7 +687,7 @@
     async addPayment(investmentId, payment) {
       const inv = findInvestment(investmentId);
       if (!inv) return;
-      await insert("investment_payments", {
+      const row = await insert("investment_payments", {
         investment_id: investmentId,
         amount: payment.amount,
         currency: payment.currency || inv.currency,
@@ -695,6 +695,10 @@
         method: payment.method,
         note: payment.note,
       });
+      // Keep the in-memory payment list in sync so the detail screen updates
+      // without a re-hydrate.
+      if (!Array.isArray(window.__investmentPayments)) window.__investmentPayments = [];
+      window.__investmentPayments.unshift(row);
       const newPaid = (inv.paid || 0) + Number(payment.amount);
       await investments.update(investmentId, {
         paid: newPaid,
@@ -702,9 +706,10 @@
       });
       logActivity({
         entity: "investment", entity_id: investmentId, action: "updated",
-        message: `Payment recorded — ${inv.name}: ${payment.currency} ${payment.amount}`,
+        message: `Payment recorded — ${inv.name}: ${payment.currency || inv.currency} ${payment.amount}`,
         tag: "real-estate",
       });
+      return row;
     },
     async addSiteUpdate(investmentId, update) {
       const inv = findInvestment(investmentId);

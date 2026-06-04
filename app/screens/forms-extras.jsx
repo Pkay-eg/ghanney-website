@@ -559,4 +559,128 @@ const TeamInviteForm = ({ onClose, defaultMember = null }) => {
   );
 };
 
-Object.assign(window, { ContractForm, SiteUpdateForm, TeamInviteForm });
+// ---------- Investment payment form (log a historical payment) ----------
+const PAYMENT_METHODS = ["Bank transfer", "Cash", "Cheque", "Mobile money", "Card", "Other"];
+
+const InvestmentPaymentForm = ({ onClose, defaultInvestmentId = null, defaultAmount = null }) => {
+  const $ = useMoney();
+  const [done, setDone] = React.useState(null);
+  const [form, setForm] = React.useState({
+    investmentId: defaultInvestmentId || investments[0]?.id || "",
+    amount: defaultAmount != null ? String(defaultAmount) : "",
+    date: new Date().toISOString().slice(0, 10),
+    method: "",
+    note: "",
+  });
+  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
+  const inv = investments.find((i) => i.id === form.investmentId);
+  const currency = inv?.currency || "USD";
+  const outstanding = inv ? Math.max(0, (inv.priceTotal || 0) - (inv.paid || 0)) : 0;
+
+  const submit = async () => {
+    if (!form.investmentId || !form.amount) { window.__toast?.("Pick an asset + amount"); return; }
+    const amt = parseFloat(form.amount) || 0;
+    if (amt <= 0) { window.__toast?.("Enter a payment amount"); return; }
+    const payment = { amount: amt, currency, date: form.date, method: form.method, note: form.note };
+    try {
+      if (window.db?.isConfigured?.()) {
+        await window.db.investments.addPayment(form.investmentId, payment);
+      } else {
+        // Offline fallback — bump funded amount + keep a local payment record
+        if (inv) {
+          inv.paid = (inv.paid || 0) + amt;
+          inv.progress = inv.priceTotal ? Math.min(1, inv.paid / inv.priceTotal) : 0;
+        }
+        if (!Array.isArray(window.__investmentPayments)) window.__investmentPayments = [];
+        window.__investmentPayments.unshift({
+          id: `ip-${Date.now()}`, investment_id: form.investmentId,
+          amount: amt, currency, paid_on: form.date, method: form.method, note: form.note,
+        });
+      }
+      window.__bumpRev?.();
+      setDone({ amt, inv: investments.find((i) => i.id === form.investmentId) });
+    } catch (e) {
+      window.__toast?.(e?.message || "Could not record payment");
+    }
+  };
+
+  if (done) {
+    return (
+      <SidePanel open onClose={onClose} title="Done">
+        <SuccessCard
+          title="Payment recorded."
+          message={`${formatCurrency(done.amt, currency)} logged for ${done.inv?.name}. Funded to date is now ${formatCurrency(done.inv?.paid || 0, currency)} of ${formatCurrency(done.inv?.priceTotal || 0, currency)}.`}
+          onClose={onClose}
+          onAddAnother={() => { setDone(null); set("amount", ""); set("note", ""); set("method", ""); }}
+        />
+      </SidePanel>
+    );
+  }
+
+  return (
+    <SidePanel
+      open onClose={onClose}
+      title="Add a payment"
+      subtitle="Log a payment you've already made toward this investment, with its real date."
+      footer={
+        <>
+          <button className="btn ghost" onClick={onClose}>Cancel</button>
+          <button className="btn primary" onClick={submit}><Icon name="plus" size={12} />Add payment</button>
+        </>
+      }
+    >
+      <FormSection title="Asset">
+        <Field label="Which investment?" required>
+          <Select
+            value={form.investmentId}
+            onChange={(v) => set("investmentId", v)}
+            options={investments.map((i) => ({ value: i.id, label: i.name }))}
+          />
+        </Field>
+        {inv && (
+          <div className="card flat" style={{ padding: 14 }}>
+            <div className="row between" style={{ fontSize: 12 }}>
+              <span className="muted">Committed</span>
+              <span className="mono">{formatCurrency(inv.priceTotal, currency)}</span>
+            </div>
+            <div className="row between" style={{ fontSize: 12, marginTop: 6 }}>
+              <span className="muted">Funded to date</span>
+              <span className="mono">{formatCurrency(inv.paid, currency)}</span>
+            </div>
+            <div className="row between" style={{ fontSize: 12, marginTop: 6 }}>
+              <span className="muted">Outstanding</span>
+              <span className="mono">{formatCurrency(outstanding, currency)}</span>
+            </div>
+            <div className="bar pos" style={{ marginTop: 10 }}><i style={{ width: `${inv.priceTotal ? Math.min(100, (inv.paid / inv.priceTotal) * 100) : 0}%` }} /></div>
+          </div>
+        )}
+      </FormSection>
+
+      <FormSection title="Payment">
+        <div className="input-row">
+          <Field label="Amount" required hint="Native currency of the asset.">
+            <MoneyInput
+              amount={form.amount}
+              currency={currency}
+              onAmountChange={(v) => set("amount", v)}
+              onCurrencyChange={() => {}}
+              currencies={[currency]}
+            />
+          </Field>
+          <Field label="Date paid" required hint="Use the real date this payment was made.">
+            <Input value={form.date} onChange={(v) => set("date", v)} type="date" />
+          </Field>
+        </div>
+        <Field label="Method (optional)">
+          <Select value={form.method} onChange={(v) => set("method", v)} placeholder="How was it paid?" options={PAYMENT_METHODS} />
+        </Field>
+        <Field label="Note (optional)">
+          <TextArea value={form.note} onChange={(v) => set("note", v)} placeholder="e.g. 2nd instalment, milestone payment, deposit…" rows={2} />
+        </Field>
+      </FormSection>
+    </SidePanel>
+  );
+};
+
+Object.assign(window, { ContractForm, SiteUpdateForm, TeamInviteForm, InvestmentPaymentForm });
